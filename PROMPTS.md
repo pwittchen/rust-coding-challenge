@@ -21,3 +21,11 @@ In the CLAUDE.md add assumptions that each commit performed by claude should not
 ## 2026-08-29 00:07:53
 
 /commit
+
+## 2026-08-29 00:11:05
+
+add libraries mentioned as useful in the SPEC.md to the Cargo.toml dependencies
+
+## 2026-08-29 00:11:44
+
+/commit
