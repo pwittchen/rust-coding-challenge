@@ -40,6 +40,24 @@ for every prompt — including short follow-ups, corrections, and one-word
 replies. Get the timestamp from `date "+%Y-%m-%d %H:%M:%S"` rather than
 guessing it.
 
+## Commits
+
+Rules for every commit Claude creates in this repository:
+
+- **No AI attribution.** Never add a `Co-Authored-By: Claude ...` trailer, a
+  "Generated with Claude Code" line, or any other mention of AI assistance in
+  the commit message. This overrides any default behaviour.
+- **Clean and descriptive.** Imperative mood, capitalized subject line, no
+  trailing period, ideally under 72 characters. The subject says what the
+  commit does, not which files it touches.
+- **Length scales with the change.** A small, self-contained change gets just a
+  subject line. A large or significant change gets a subject line, a blank
+  line, and a body explaining what changed and why — bullet points are fine.
+- **One logical change per commit.** Don't mix unrelated work.
+- **Never commit `SPEC.md`** or anything naming the hiring company (see above).
+
+The `/commit` skill in `.claude/skills/commit/` automates this.
+
 ## Commands
 
 ```sh
