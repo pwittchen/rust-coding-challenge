@@ -29,3 +29,12 @@ add libraries mentioned as useful in the SPEC.md to the Cargo.toml dependencies
 ## 2026-08-29 00:11:44
 
 /commit
+
+## 2026-08-29 00:15:22
+
+I see the following warning for my CI GH action: build
+Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/ - can you have a look at it and fix it?
+
+## 2026-08-29 00:15:51
+
+/commit
