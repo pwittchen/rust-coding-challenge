@@ -15,6 +15,10 @@ serde = { version = "1.0.229", features = ["derive"] }
 # The engine handles money: there is no reason for it to reach for unsafe, and
 # `forbid` means not even a local `allow` can turn this off again.
 unsafe_code = "forbid"
+# The code is meant to be read and reviewed without its author present, so
+# every public item says what it is for. Left to review, that slips; denied
+# here, an undocumented one fails the build.
+missing_docs = "deny"
 
 [lints.clippy]
 # Nothing outside the tests may panic. Every failure is a value the caller has

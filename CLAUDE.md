@@ -32,7 +32,7 @@ The crate is a library plus a thin binary that drives it:
 | File | Responsibility |
 | --- | --- |
 | `src/main.rs` | The CLI: argument handling, streaming the input into the engine, reporting errors |
-| `src/lib.rs` | Module declarations only |
+| `src/lib.rs` | Module declarations, and the map of how they fit together |
 | `src/transaction.rs` | The data model of a transaction and of the history a dispute refers back to |
 | `src/input.rs` | Reading transactions from a CSV, as a lazy stream |
 | `src/account.rs` | A client's account: its balances and the checked operations that move them |
@@ -64,6 +64,14 @@ Design points worth preserving when changing the code:
   exempts test code only. Don't weaken these, and don't reach for `#[allow]` —
   the fix is to return an error instead. They are described in the README's
   "Safety and robustness" section; keep the two in sync.
+- **Every public item is documented, and the build enforces it.** `Cargo.toml`
+  denies `missing_docs`, so a new public item, field or module without a doc
+  comment fails the build. The fix is to write the comment, not to silence the
+  lint. It is described in the README's "Maintainability" section.
+- **The code is read by reviewers who cannot ask questions.** Keep one concern
+  per module, one place to change any given thing, and the reasoning on the code
+  it explains. `src/lib.rs` carries the map of how the modules fit together;
+  update it if the shape of the crate changes.
 - **Assumptions are documented where they are implemented.** The open cases in
   the spec are resolved in `src/engine.rs`, with the reasoning on the method that
   implements each decision, and summarized in the README's "Assumptions"

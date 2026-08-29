@@ -94,12 +94,16 @@ impl Engine {
             return;
         };
 
-        if repeated || account.is_locked() || !account.deposit(amount) {
+        if repeated || account.is_locked() {
             return;
         }
 
-        self.transactions
-            .insert(tx, TransactionRecord::new(client, amount));
+        // Recorded only once the money has actually moved, so that a deposit
+        // the account refused is not left behind for a dispute to find.
+        if account.deposit(amount) {
+            self.transactions
+                .insert(tx, TransactionRecord::new(client, amount));
+        }
     }
 
     /// Debits the client's account, unless the available funds do not cover the

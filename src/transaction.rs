@@ -50,10 +50,15 @@ pub enum TransactionType {
 /// transaction by ID and carry no amount of their own.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct Transaction {
+    /// What the transaction does, from the `type` column.
     #[serde(rename = "type")]
     pub kind: TransactionType,
+    /// The client whose account the transaction is about.
     pub client: ClientId,
+    /// The transaction's own ID, or — for a dispute, resolve or chargeback —
+    /// the ID of the transaction it refers back to.
     pub tx: TxId,
+    /// The amount of money to move, for the kinds that move any.
     #[serde(deserialize_with = "deserialize_amount")]
     pub amount: Option<Amount>,
 }
@@ -128,8 +133,13 @@ pub enum DisputeState {
 /// number of referable transactions rather than with the size of the input.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransactionRecord {
+    /// The client the transaction belonged to, so that a dispute raised by
+    /// anybody else can be turned away.
     pub client: ClientId,
+    /// The amount that was actually applied, which is what a dispute holds and
+    /// a chargeback reverses.
     pub amount: Amount,
+    /// Where the transaction stands in the dispute lifecycle.
     pub state: DisputeState,
 }
 

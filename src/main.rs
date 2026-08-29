@@ -1,3 +1,10 @@
+//! The command line front end of the payments engine.
+//!
+//! This is the whole program, read top to bottom: take the input file from the
+//! arguments, stream its records through the engine, write the report. All of
+//! the transaction logic lives in the library: `engine` holds the rules, and
+//! `lib.rs` maps out the modules it is built from.
+
 use std::env;
 use std::error::Error;
 use std::ffi::OsString;

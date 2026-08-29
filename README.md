@@ -117,8 +117,9 @@ cargo clippy --all-targets -- -D warnings
 
 The lints that keep the code free of `unsafe`, of panics, and of floating-point
 arithmetic are declared in [`Cargo.toml`](Cargo.toml) and described under
-[Safety and robustness](#safety-and-robustness). CI runs the formatting check,
-the lints, and the tests on every push and pull request.
+[Safety and robustness](#safety-and-robustness); the one that keeps every public
+item documented is described under [Maintainability](#maintainability). CI runs
+the formatting check, the lints, and the tests on every push and pull request.
 
 ## Testing
 
@@ -274,17 +275,60 @@ watching in that setting is the disputable history summed over the live streams;
 as noted above, a server would put a persistent, ageing-out store behind it
 rather than change the transaction logic.
 
-## Project layout
+## Maintainability
+
+The code is meant to be read by someone the author cannot answer questions to,
+so it is arranged to be read rather than merely to work.
+
+**One transaction travels in a straight line.** The modules are worth reading in
+the order it takes through them:
+
+```text
+CSV row --> input --> transaction --> engine --> account --> output --> CSV row
+```
 
 | File | Responsibility |
 | --- | --- |
 | `src/main.rs` | The CLI: argument handling, streaming the input into the engine, reporting errors |
+| `src/lib.rs` | The map of the crate: the diagram above, and what each module is for |
 | `src/transaction.rs` | The data model of a transaction and of the history a dispute refers back to |
 | `src/input.rs` | Reading transactions from a CSV, as a lazy stream |
 | `src/account.rs` | A client's account: its balances and the checked operations that move them |
 | `src/engine.rs` | All transaction logic: deposits, withdrawals, disputes, chargebacks |
 | `src/output.rs` | Writing the resulting account state as CSV |
 | `tests/cli.rs` | End-to-end tests of the binary: its streams and exit status |
+
+**Every rule about money lives in one module, and every rule about balances in
+another.** If you want to know what a chargeback does, `src/engine.rs` has one
+short method per transaction type and nothing else. If you want to know that the
+arithmetic is sound, `src/account.rs` is barely a hundred lines of code and
+every mutation funnels through a single checked helper. Neither module can be
+broken by a change to the CSV handling at either end, and the CSV handling knows
+nothing about disputes.
+
+**The reasoning sits on the code it explains.** Each decision the specification
+leaves open is documented on the method that implements it, so the "why" is
+found by reading the "what" rather than by cross-referencing a document — the
+[Assumptions](#assumptions) below are a summary of those comments, not their
+home. Comments throughout explain intent; anything a reader could get from the
+code itself is left to the code.
+
+**Names, not cleverness.** The domain speaks for itself — `deposit`, `withdraw`,
+`hold`, `release`, `reverse`, `disputable`. Amounts, client IDs and transaction
+IDs are named types rather than bare integers. Nothing is abbreviated, no
+function takes a boolean flag that changes what it does, and there is no macro,
+no generic machinery, and no abstraction with a single implementation.
+
+**Guardrails are declared, not remembered.** The lints in
+[`Cargo.toml`](Cargo.toml) mean the panic-free and float-free rules cannot be
+broken by someone who has not read this file, and `missing_docs` means a new
+public item without an explanation fails the build. There is one place the CSV
+reader is configured, one place a balance can change, and one place an error
+becomes a message — so a change lands in exactly one spot.
+
+**The documentation is tested.** The sample input and the report shown under
+[Running](#running) are asserted by a test in `src/output.rs`, so the example a
+reader trusts cannot quietly drift away from what the program does.
 
 ## Assumptions
 

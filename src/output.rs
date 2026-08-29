@@ -25,9 +25,9 @@ impl From<&Account> for AccountReport {
     fn from(account: &Account) -> Self {
         Self {
             client: account.client(),
-            available: amount(account.available()),
-            held: amount(account.held()),
-            total: amount(account.total()),
+            available: format_amount(account.available()),
+            held: format_amount(account.held()),
+            total: format_amount(account.total()),
             locked: account.is_locked(),
         }
     }
@@ -44,7 +44,7 @@ impl From<&Account> for AccountReport {
 /// decimal keeps a sign of its own, so subtracting a zero amount — holding the
 /// funds of a deposit too small to register, say — leaves a negative zero
 /// behind, and `-0.0000` is not a balance any reader of the report expects.
-fn amount(value: Amount) -> String {
+fn format_amount(value: Amount) -> String {
     let value = if value.is_zero() { Amount::ZERO } else { value };
 
     format!("{:.*}", SCALE as usize, value)
@@ -203,8 +203,8 @@ mod tests {
 
     #[test]
     fn reports_a_zero_balance_without_a_negative_sign() {
-        assert_eq!(amount(Amount::ZERO), "0.0000");
-        assert_eq!(amount(-Amount::ZERO), "0.0000");
+        assert_eq!(format_amount(Amount::ZERO), "0.0000");
+        assert_eq!(format_amount(-Amount::ZERO), "0.0000");
     }
 
     #[test]

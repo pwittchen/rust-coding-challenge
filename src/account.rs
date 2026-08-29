@@ -13,6 +13,11 @@ use crate::transaction::{Amount, ClientId};
 /// The balances are private so that they can only change through the operations
 /// below, each of which upholds the invariant that `total = available + held`
 /// and that all three amounts stay representable.
+///
+/// Every operation that moves money returns whether it did: `true` when the
+/// balances changed, `false` when the operation was refused and the account was
+/// left exactly as it was. There is no third outcome — an operation never
+/// half-applies — so the caller can act on the answer as a plain yes or no.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Account {
     client: ClientId,
@@ -65,6 +70,10 @@ impl Account {
     }
 
     /// Debits `amount` from the available funds, unless they do not cover it.
+    ///
+    /// The engine has nothing to do when a withdrawal is refused — the
+    /// specification says to ignore it — so this is the one operation whose
+    /// answer the caller may drop.
     pub(crate) fn withdraw(&mut self, amount: Amount) -> bool {
         self.available >= amount && self.shift(-amount, Decimal::ZERO)
     }

@@ -7,21 +7,26 @@ use csv::{ReaderBuilder, Trim};
 
 use crate::transaction::Transaction;
 
-/// Streams the transactions read from `reader`.
+/// How the input is read, for both of the readers below.
+///
+/// Surrounding whitespace is trimmed, and rows that leave the `amount` field
+/// empty — or omit it entirely — are accepted, since disputes, resolves and
+/// chargebacks carry no amount. The settings live here, in one place, so that
+/// reading a file and reading a stream cannot drift apart.
+fn builder() -> ReaderBuilder {
+    let mut builder = ReaderBuilder::new();
+    builder.trim(Trim::All).flexible(true);
+
+    builder
+}
+
+/// Streams the transactions read from `source`.
 ///
 /// Records are decoded lazily, one at a time, so the input never has to be held
 /// in memory in full. Any `Read` is accepted, so the same code path serves a
 /// file, a socket, or a test fixture.
-///
-/// Surrounding whitespace is trimmed, and rows that leave the `amount` field
-/// empty — or omit it entirely — are accepted, since disputes, resolves and
-/// chargebacks carry no amount.
-pub fn read_transactions<R: Read>(reader: R) -> impl Iterator<Item = csv::Result<Transaction>> {
-    ReaderBuilder::new()
-        .trim(Trim::All)
-        .flexible(true)
-        .from_reader(reader)
-        .into_deserialize::<Transaction>()
+pub fn read_transactions<R: Read>(source: R) -> impl Iterator<Item = csv::Result<Transaction>> {
+    builder().from_reader(source).into_deserialize()
 }
 
 /// Streams the transactions from the CSV file at `path`.
@@ -31,12 +36,7 @@ pub fn read_transactions<R: Read>(reader: R) -> impl Iterator<Item = csv::Result
 pub fn read_transactions_from_path(
     path: &Path,
 ) -> csv::Result<impl Iterator<Item = csv::Result<Transaction>>> {
-    let reader = ReaderBuilder::new()
-        .trim(Trim::All)
-        .flexible(true)
-        .from_path(path)?;
-
-    Ok(reader.into_deserialize::<Transaction>())
+    Ok(builder().from_path(path)?.into_deserialize())
 }
 
 #[cfg(test)]
