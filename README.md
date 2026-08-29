@@ -116,8 +116,9 @@ cargo test
 
 The unit tests live next to the code they cover: argument handling in
 `src/main.rs`, parsing and reading the input in `src/transaction.rs` and
-`src/input.rs`, every transaction type and its edge cases in `src/engine.rs`,
-and the shape and precision of the report in `src/output.rs`. The engine tests
+`src/input.rs`, the balance arithmetic in `src/account.rs`, every transaction
+type and its edge cases in `src/engine.rs`, and the shape and precision of the
+report in `src/output.rs`. The engine tests
 drive the engine through the same CSV parsing the binary uses, so they exercise
 the whole path from input row to account state.
 
@@ -141,7 +142,8 @@ the code cannot drift apart.
 | `src/main.rs` | The CLI: argument handling, streaming the input into the engine, reporting errors |
 | `src/transaction.rs` | The data model of a transaction and of the history a dispute refers back to |
 | `src/input.rs` | Reading transactions from a CSV, as a lazy stream |
-| `src/engine.rs` | All transaction logic: accounts, balances, disputes, chargebacks |
+| `src/account.rs` | A client's account: its balances and the checked operations that move them |
+| `src/engine.rs` | All transaction logic: deposits, withdrawals, disputes, chargebacks |
 | `src/output.rs` | Writing the resulting account state as CSV |
 
 ## Assumptions

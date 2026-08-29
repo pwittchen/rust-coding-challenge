@@ -114,3 +114,11 @@ have a look at the Scoring section in the SPEC.md - ensure that categories Basic
 ## 2026-08-29 14:30:20
 
 /commit
+
+## 2026-08-29 14:32:11
+
+Extract code related to the account from the engine.rs and place it in the new account.rs file
+
+## 2026-08-29 14:34:08
+
+/commit

@@ -4,7 +4,7 @@ use std::io::Write;
 
 use serde::Serialize;
 
-use crate::engine::Account;
+use crate::account::Account;
 use crate::transaction::{Amount, ClientId, SCALE};
 
 /// One row of the account report.

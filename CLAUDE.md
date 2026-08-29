@@ -35,7 +35,8 @@ The crate is a library plus a thin binary that drives it:
 | `src/lib.rs` | Module declarations only |
 | `src/transaction.rs` | The data model of a transaction and of the history a dispute refers back to |
 | `src/input.rs` | Reading transactions from a CSV, as a lazy stream |
-| `src/engine.rs` | All transaction logic: accounts, balances, disputes, chargebacks |
+| `src/account.rs` | A client's account: its balances and the checked operations that move them |
+| `src/engine.rs` | All transaction logic: deposits, withdrawals, disputes, chargebacks |
 | `src/output.rs` | Writing the resulting account state as CSV |
 
 Design points worth preserving when changing the code:
@@ -44,10 +45,11 @@ Design points worth preserving when changing the code:
   never held in memory in full. Keep it that way.
 - **Fixed-point amounts.** Money is `rust_decimal::Decimal`, never a float.
   Balances are reported with exactly four decimal places.
-- **Balance mutations are all-or-nothing.** `Account` keeps its fields private
-  and every mutation goes through checked arithmetic that leaves the account
-  untouched on overflow, so `total = available + held` always holds and no
-  arithmetic can panic.
+- **Balance mutations are all-or-nothing.** `Account` (in `src/account.rs`)
+  keeps its fields private and every mutation goes through checked arithmetic
+  that leaves the account untouched on overflow, so `total = available + held`
+  always holds and no arithmetic can panic. The engine may only move balances
+  through those operations.
 - **Unapplicable transactions are ignored, malformed input aborts the run.** An
   unknown transaction ID or an uncovered withdrawal is skipped and processing
   continues; a record that will not parse is an error on stderr and a non-zero
@@ -59,7 +61,7 @@ Design points worth preserving when changing the code:
 
 ## Tests
 
-Unit tests live in `mod tests` next to the code they cover (63 at present).
+Unit tests live in `mod tests` next to the code they cover (64 at present).
 Engine and output tests drive the code through the same CSV parsing the binary
 uses, so they exercise the whole path from input row to account state. New
 behaviour needs a test in the module that owns it.
