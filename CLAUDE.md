@@ -67,6 +67,12 @@ Design points worth preserving when changing the code:
   Summing two balances goes through `checked_add` or `saturating_add`, never
   `+`, because a `Decimal` addition panics on overflow. They are described in
   the README's "Safety and robustness" section; keep the two in sync.
+  These lints cover this crate and cannot see inside a dependency. The one place
+  that bites is rendering a balance: `format!("{:.4}", amount)` builds the text
+  in a fixed 32-byte buffer and panics from inside `rust_decimal` on a balance of
+  28 or more integer digits, which an account will accept. `format_amount` in
+  `src/output.rs` therefore lays the digits out itself — don't replace it with a
+  precision specifier.
 - **Every public item is documented, and the build enforces it.** `Cargo.toml`
   denies `missing_docs`, so a new public item, field or module without a doc
   comment fails the build. The fix is to write the comment, not to silence the
@@ -82,7 +88,7 @@ Design points worth preserving when changing the code:
 
 ## Tests
 
-Unit tests live in `mod tests` next to the code they cover (69 at present).
+Unit tests live in `mod tests` next to the code they cover (73 at present).
 Engine and output tests drive the code through the same CSV parsing the binary
 uses, so they exercise the whole path from input row to account state. New
 behaviour needs a test in the module that owns it.

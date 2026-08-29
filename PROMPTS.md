@@ -174,3 +174,7 @@ run cargo lint command and apply fixes found by this command
 ## 2026-08-29 15:28:46
 
 /commit
+
+## 2026-08-29 15:34:54
+
+apply fixes for the found issues

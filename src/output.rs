@@ -40,6 +40,15 @@ impl From<&Account> for AccountReport {
 /// places no matter how it was arrived at. Nothing is lost in the process: the
 /// engine already holds every balance at this scale.
 ///
+/// The digits are laid out by hand rather than by asking the decimal for a fixed
+/// number of places. Given a precision, its formatter builds the text in a
+/// fixed 32-byte buffer and panics when the result does not fit — which it does
+/// not for a balance of 28 or more integer digits, since four forced decimals
+/// and the point push it past the buffer. Rendering without a precision is
+/// sized by the mantissa and cannot overflow, so the fraction is padded, or cut,
+/// to the reported scale here instead. Balances are held at that scale already,
+/// so in practice this only ever pads.
+///
 /// A balance that lands on exactly zero is reported as a positive zero. The
 /// decimal keeps a sign of its own, so subtracting a zero amount — holding the
 /// funds of a deposit too small to register, say — leaves a negative zero
@@ -47,7 +56,18 @@ impl From<&Account> for AccountReport {
 fn format_amount(value: Amount) -> String {
     let value = if value.is_zero() { Amount::ZERO } else { value };
 
-    format!("{:.*}", SCALE as usize, value)
+    let text = value.to_string();
+    let (whole, fraction) = text.split_once('.').unwrap_or((text.as_str(), ""));
+
+    let mut formatted = String::from(whole);
+    formatted.push('.');
+
+    let mut digits = fraction.chars();
+    for _ in 0..SCALE {
+        formatted.push(digits.next().unwrap_or('0'));
+    }
+
+    formatted
 }
 
 /// Writes `accounts` to `writer` as CSV, one row per client.
@@ -210,6 +230,62 @@ mod tests {
     fn reports_a_zero_balance_without_a_negative_sign() {
         assert_eq!(format_amount(Amount::ZERO), "0.0000");
         assert_eq!(format_amount(-Amount::ZERO), "0.0000");
+    }
+
+    #[test]
+    fn reports_the_largest_balance_an_account_can_hold() {
+        // `src/account.rs` proves an account accepts a deposit of `Amount::MAX`,
+        // so the report has to be able to print one: a balance the engine can
+        // store but not render would be a panic waiting on the last line of a
+        // successful run.
+        assert_eq!(
+            format_amount(Amount::MAX),
+            "79228162514264337593543950335.0000"
+        );
+        assert_eq!(
+            format_amount(-Amount::MAX),
+            "-79228162514264337593543950335.0000"
+        );
+    }
+
+    #[test]
+    fn reports_a_balance_whose_digits_exceed_a_fixed_width_buffer() {
+        // Twenty-eight integer digits and four decimals do not fit the buffer
+        // the decimal's own formatter uses when it is given a precision, which
+        // is why `format_amount` lays the digits out itself.
+        let balance: Amount = "1234567890123456789012345678"
+            .parse()
+            .expect("valid decimal");
+
+        assert_eq!(format_amount(balance), "1234567890123456789012345678.0000");
+    }
+
+    #[test]
+    fn reports_a_large_balance_driven_negative_by_a_chargeback() {
+        // The same boundary reached through the engine rather than by hand, and
+        // on the sign that adds a character to the rendered balance.
+        let report = report(
+            "type,client,tx,amount\n\
+             deposit,1,1,1234567890123456789012345678\n\
+             withdrawal,1,2,1234567890123456789012345678\n\
+             dispute,1,1,\n\
+             chargeback,1,1,\n",
+        );
+
+        assert_eq!(
+            report,
+            "client,available,held,total,locked\n\
+             1,-1234567890123456789012345678.0000,0.0000,-1234567890123456789012345678.0000,true\n"
+        );
+    }
+
+    #[test]
+    fn cuts_a_fraction_finer_than_the_reported_scale() {
+        // Balances reach the report already cut to scale, so this only guards
+        // the renderer itself against ever widening a row.
+        let balance: Amount = "1.23456789".parse().expect("valid decimal");
+
+        assert_eq!(format_amount(balance), "1.2345");
     }
 
     #[test]

@@ -153,11 +153,14 @@ to somebody else; a chargeback that freezes the account and leaves the total
 negative; and further transactions arriving on a frozen account. The boundaries
 are covered too: the largest client and transaction IDs, four-decimal precision,
 amounts finer than that, an amount with more significant digits than a float
-could hold — which is read and kept exactly — and balances that would overflow.
-One test runs two engines on two threads, which is what a server serving many
-streams at once would do. One test runs the
-sample input above and asserts the report documented for it, so the example and
-the code cannot drift apart.
+could hold — which is read and kept exactly — balances that would overflow, and
+the largest balance an account can hold, both rendered directly and reached
+through a chargeback that drives it negative, since a balance the engine accepts
+but the report cannot print would be a failure on the last line of an otherwise
+successful run. One test runs two engines on two threads, which is what a server
+serving many streams at once would do. One test runs the sample input above and
+asserts the report documented for it, so the example and the code cannot drift
+apart.
 
 ## Safety and robustness
 
@@ -173,6 +176,20 @@ slice indexing are denied. Every failure is a value the caller has to deal
 with, so no input can take the process down part-way through a report, and a
 failed run produces a message rather than a backtrace. `main` is the single
 place that turns an error into a message on stderr and a non-zero exit status.
+
+The lint is worth reading for exactly what it is: it covers the code in this
+crate, and it cannot see inside a dependency. A library function that panics
+internally is still a panic, and denying `panic` here does not catch it — the
+same gap that makes the rule about checked arithmetic below a separate line
+rather than a consequence of this one. Where a dependency's contract has such an
+edge, the crate stays off it deliberately: rendering a balance to a fixed number
+of decimal places is the one place this arose, and
+[`src/output.rs`](src/output.rs) lays the digits out itself rather than asking
+the decimal for a precision, because that path builds the text in a fixed 32-byte
+buffer and panics on a balance of 28 or more integer digits — a balance an
+account will accept. The comment on the function says so, and tests in that
+module render `Decimal::MAX` and a chargeback that drives a balance of that size
+negative.
 
 **No floats.** `float_arithmetic` is denied, so a balance cannot silently lose
 a fraction of a cent: the type system rejects the arithmetic rather than the
