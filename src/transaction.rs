@@ -18,6 +18,13 @@ pub type TxId = u32;
 /// error, which would be unacceptable for balances.
 pub type Amount = Decimal;
 
+/// Number of decimal places an amount is held and reported with, as guaranteed
+/// by the input format and required by the output format.
+///
+/// Amounts are cut to this scale on the way in and rendered at it on the way
+/// out, so the balances the engine holds are exactly the ones the report prints.
+pub const SCALE: u32 = 4;
+
 /// The kind of a transaction, taken from the `type` column.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]

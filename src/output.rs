@@ -5,11 +5,7 @@ use std::io::Write;
 use serde::Serialize;
 
 use crate::engine::Account;
-use crate::transaction::{Amount, ClientId};
-
-/// Number of decimal places monetary amounts are reported with, as required by
-/// the output format.
-const SCALE: usize = 4;
+use crate::transaction::{Amount, ClientId, SCALE};
 
 /// One row of the account report.
 ///
@@ -41,9 +37,17 @@ impl From<&Account> for AccountReport {
 ///
 /// The amount is formatted here rather than left to the serializer, which drops
 /// trailing zeros, so that every balance is reported with the same four decimal
-/// places no matter how it was arrived at.
+/// places no matter how it was arrived at. Nothing is lost in the process: the
+/// engine already holds every balance at this scale.
+///
+/// A balance that lands on exactly zero is reported as a positive zero. The
+/// decimal keeps a sign of its own, so subtracting a zero amount — holding the
+/// funds of a deposit too small to register, say — leaves a negative zero
+/// behind, and `-0.0000` is not a balance any reader of the report expects.
 fn amount(value: Amount) -> String {
-    format!("{:.*}", SCALE, value)
+    let value = if value.is_zero() { Amount::ZERO } else { value };
+
+    format!("{:.*}", SCALE as usize, value)
 }
 
 /// Writes `accounts` to `writer` as CSV, one row per client.
@@ -175,6 +179,49 @@ mod tests {
             "client,available,held,total,locked\n\
              1,10.0001,0.0000,10.0001,false\n\
              2,0.0000,0.0000,0.0000,false\n"
+        );
+    }
+
+    #[test]
+    fn reports_available_and_held_that_add_up_to_the_reported_total() {
+        // Amounts finer than the report can show are cut on the way in, so no
+        // balance can carry a fraction that the report counts in the total but
+        // cannot show in the column it came from.
+        let report = report(
+            "type,client,tx,amount\n\
+             deposit,1,1,0.00005\n\
+             deposit,1,2,0.00005\n\
+             dispute,1,2,\n",
+        );
+
+        assert_eq!(
+            report,
+            "client,available,held,total,locked\n\
+             1,0.0000,0.0000,0.0000,false\n"
+        );
+    }
+
+    #[test]
+    fn reports_a_zero_balance_without_a_negative_sign() {
+        assert_eq!(amount(Amount::ZERO), "0.0000");
+        assert_eq!(amount(-Amount::ZERO), "0.0000");
+    }
+
+    #[test]
+    fn writes_the_report_documented_for_the_sample_input() {
+        // Guards the example in the README, and exercises every transaction type
+        // through the file the CLI contract names.
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/transactions.csv");
+        let input = std::fs::read_to_string(path).expect("sample input should be readable");
+
+        assert_eq!(
+            report(&input),
+            "client,available,held,total,locked\n\
+             1,1.5000,0.0000,1.5000,false\n\
+             2,2.0000,0.0000,2.0000,false\n\
+             3,6.5000,0.0000,6.5000,false\n\
+             4,0.0000,4.0000,4.0000,false\n\
+             5,0.0000,0.0000,0.0000,true\n"
         );
     }
 }

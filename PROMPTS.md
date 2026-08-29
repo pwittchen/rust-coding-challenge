@@ -106,3 +106,11 @@ Please have a deep look at the all cases regarding transactions described in the
 ## 2026-08-29 14:24:06
 
 add info about cargo clean to README.md
+
+## 2026-08-29 14:25:33
+
+have a look at the Scoring section in the SPEC.md - ensure that categories Basics and Completeness are covered properly
+
+## 2026-08-29 14:30:20
+
+/commit

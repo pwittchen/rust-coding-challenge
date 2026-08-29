@@ -17,7 +17,9 @@
 //!   [`Engine::deposit`]);
 //! - a deposit or a withdrawal opens the account of the client it names, even
 //!   when the transaction itself cannot be applied (see [`Engine::withdraw`]);
-//! - a dispute may drive the available funds negative (see [`Engine::dispute`]).
+//! - a dispute may drive the available funds negative (see [`Engine::dispute`]);
+//! - an amount carrying more than four decimal places is cut to four (see
+//!   [`usable_amount`]).
 //!
 //! Anything the engine cannot apply — an unknown transaction ID, a resolve for
 //! a transaction that is not under dispute, a withdrawal that is not covered —
@@ -28,8 +30,8 @@ use std::collections::BTreeMap;
 use rust_decimal::Decimal;
 
 use crate::transaction::{
-    Amount, ClientId, DisputeState, Transaction, TransactionRecord, TransactionType, Transactions,
-    TxId,
+    Amount, ClientId, DisputeState, SCALE, Transaction, TransactionRecord, TransactionType,
+    Transactions, TxId,
 };
 
 /// The state of a single client's asset account.
@@ -318,8 +320,18 @@ impl Engine {
 /// A missing amount, or a negative one, is an error on our partner's side: a
 /// negative deposit is a withdrawal in disguise, and would bypass the check that
 /// available funds cover it.
+///
+/// Anything past the fourth decimal place is dropped rather than rounded. The
+/// input is specified to carry no more than four, so this only bites on a
+/// malformed row, and cutting the excess keeps every balance exactly as precise
+/// as the report that prints it — otherwise a fraction too small to show could
+/// still be counted, and the reported `available` and `held` would no longer add
+/// up to the reported `total`. Dropping it also never credits a client a
+/// fraction they did not send.
 fn usable_amount(amount: Option<Amount>) -> Option<Amount> {
-    amount.filter(|amount| amount.is_sign_positive())
+    amount
+        .filter(|amount| amount.is_sign_positive())
+        .map(|amount| amount.trunc_with_scale(SCALE))
 }
 
 #[cfg(test)]
@@ -421,6 +433,31 @@ mod tests {
         );
 
         assert_balances(&engine, 1, "1.0000", "0");
+    }
+
+    #[test]
+    fn cuts_an_amount_carrying_more_than_four_decimal_places() {
+        let engine = engine(
+            "type,client,tx,amount\n\
+             deposit,1,1,1.00009\n\
+             withdrawal,1,2,0.50009\n",
+        );
+
+        // Both amounts are cut, not rounded: 1.0000 in, 0.5000 out.
+        assert_balances(&engine, 1, "0.5", "0");
+    }
+
+    #[test]
+    fn holds_the_cut_amount_when_an_over_precise_deposit_is_disputed() {
+        let engine = engine(
+            "type,client,tx,amount\n\
+             deposit,1,1,2.00005\n\
+             dispute,1,1,\n",
+        );
+
+        // The recorded amount is the one that was credited, so the dispute moves
+        // the balance to held in full and leaves nothing behind.
+        assert_balances(&engine, 1, "0", "2.0");
     }
 
     #[test]
