@@ -23,6 +23,37 @@
 //! The split is deliberate: the rules of the business live in one module, the
 //! arithmetic that protects the balances in another, and the CSV format at the
 //! two ends. Each can be read, tested and changed without the others.
+//!
+//! # Example
+//!
+//! The three steps the diagram above describes, end to end. Reading is generic
+//! over [`std::io::Read`], so a socket serves here just as well as the file the
+//! binary is given:
+//!
+//! ```
+//! use rust_coding_challenge::engine::Engine;
+//! use rust_coding_challenge::{input, output};
+//!
+//! let transactions = "type, client, tx, amount\n\
+//!                     deposit, 1, 1, 2.0\n\
+//!                     withdrawal, 1, 2, 0.5\n";
+//!
+//! // Applied as they arrive, so the input is never held in memory in full.
+//! let mut engine = Engine::new();
+//! for transaction in input::read_transactions(transactions.as_bytes()) {
+//!     engine.apply(&transaction?);
+//! }
+//!
+//! let mut report = Vec::new();
+//! output::write_accounts(&mut report, engine.accounts())?;
+//!
+//! assert_eq!(
+//!     String::from_utf8(report)?,
+//!     "client,available,held,total,locked\n\
+//!      1,1.5000,0.0000,1.5000,false\n"
+//! );
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
 
 pub mod account;
 pub mod engine;

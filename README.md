@@ -160,7 +160,8 @@ but the report cannot print would be a failure on the last line of an otherwise
 successful run. One test runs two engines on two threads, which is what a server
 serving many streams at once would do. One test runs the sample input above and
 asserts the report documented for it, so the example and the code cannot drift
-apart.
+apart, and the example on the crate's own documentation is compiled and run as a
+doc test for the same reason.
 
 ## Safety and robustness
 
