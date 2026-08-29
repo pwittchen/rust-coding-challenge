@@ -113,7 +113,20 @@ and what is merely ignored.
 cargo fmt              # format the code
 cargo fmt --check      # verify the formatting without changing anything
 cargo clippy --all-targets -- -D warnings
+cargo lint             # the pedantic pass, as an alias
 ```
+
+`cargo lint` is a Cargo alias defined in [`.cargo/config.toml`](.cargo/config.toml):
+
+```toml
+[alias]
+lint = "clippy -- -W clippy::all -W clippy::pedantic"
+```
+
+It runs Clippy with the `pedantic` group turned on as warnings, which is a wider
+net than the CI command above and a shorter thing to type. It is advisory — the
+build-breaking lints are the ones denied in [`Cargo.toml`](Cargo.toml), and
+`cargo clippy --all-targets -- -D warnings` is what CI runs.
 
 The lints that keep the code free of `unsafe`, of panics, and of floating-point
 arithmetic are declared in [`Cargo.toml`](Cargo.toml) and described under

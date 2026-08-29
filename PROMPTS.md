@@ -186,3 +186,7 @@ apply fixes for the found issues
 ## 2026-08-29 15:45:49
 
 /commit
+
+## 2026-08-29 15:46:58
+
+document cargo lint alias in the README.md
