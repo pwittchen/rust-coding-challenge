@@ -95,6 +95,11 @@ and `.github/workflows/rust.yml` (CI: `cargo fmt --check`, `cargo build`,
 `cargo clippy` and `cargo test` on push and PR to `master`). `accounts.csv` is
 generated output and is gitignored.
 
+The `/score` skill in `.claude/skills/score/` grades the project against the
+scoring criteria in `SPEC.md`: it builds, runs and probes the binary, reads the
+sources, and reports a grade with evidence per category. It assesses only —
+fixes are a separate, explicit request.
+
 ## Prompt log
 
 Every prompt the user writes must be appended verbatim to `PROMPTS.md` at the
