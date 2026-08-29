@@ -58,6 +58,19 @@ Rules for every commit Claude creates in this repository:
 
 The `/commit` skill in `.claude/skills/commit/` automates this.
 
+## Checks after every change
+
+After implementing a change, always run:
+
+```sh
+cargo fmt      # the code must be properly formatted
+cargo build    # the program must build
+cargo test     # the tests must pass
+```
+
+Run all three before reporting the change as done, and fix anything they
+surface. A change is not finished while any of them fails.
+
 ## Commands
 
 ```sh

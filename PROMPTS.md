@@ -62,3 +62,11 @@ Now, implement logic of loading transactions.csv file into the program, ensure y
 ## 2026-08-29 12:54:22
 
 /commit
+
+## 2026-08-29 12:55:55
+
+in the CLAUDE.md add info that after implementing each change, we need to run cargo fmt, cargo build and cargo test, to ensure that program is properly formatted, builds and tests are passing
+
+## 2026-08-29 12:56:21
+
+/commit
