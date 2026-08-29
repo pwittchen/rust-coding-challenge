@@ -86,3 +86,15 @@ create README.md file with brief description of the program, information how to 
 ## 2026-08-29 14:09:21
 
 /commit
+
+## 2026-08-29 14:10:03
+
+update CLAUDE.md file according to the current project state
+
+## 2026-08-29 14:12:47
+
+in the CLAUDE.md add note that SPEC.md is ignored by the git, available only locally in the repo, but not pushed publicly
+
+## 2026-08-29 14:13:11
+
+/commit
