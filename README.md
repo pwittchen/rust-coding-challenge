@@ -259,10 +259,14 @@ KB one.
 
 **Memory tracks what can still be disputed, not what has been read.** The engine
 keeps one account per client — at most `u16::MAX` of them, 36 bytes each — and
-one 20-byte record per applied deposit, holding only the client, the amount, and
-where the deposit stands in the dispute lifecycle. Withdrawals are not retained
-at all, since nothing can refer back to one. Two runs over inputs of the same
-size show the difference:
+one record per applied deposit, holding only the client, the amount, and where
+the deposit stands in the dispute lifecycle. The record itself is 20 bytes;
+retained in the history it costs about 78, once its key, the hash table's
+control byte, the load factor that keeps lookups fast, and the doubling that
+briefly holds both tables at once are counted. That last figure is the one to
+budget with, and it is what the measurements below show. Withdrawals are not
+retained at all, since nothing can refer back to one. Two runs over inputs of the
+same size show the difference:
 
 | Input (5 million records, ~137 MB) | Time | Peak memory |
 | --- | --- | --- |
