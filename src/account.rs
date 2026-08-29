@@ -28,6 +28,7 @@ pub struct Account {
 
 impl Account {
     /// Opens an empty account for `client`.
+    #[must_use]
     pub fn new(client: ClientId) -> Self {
         Self {
             client,
@@ -38,21 +39,25 @@ impl Account {
     }
 
     /// The account's owner.
+    #[must_use]
     pub fn client(&self) -> ClientId {
         self.client
     }
 
     /// Funds available for trading, staking, withdrawal, etc.
+    #[must_use]
     pub fn available(&self) -> Amount {
         self.available
     }
 
     /// Funds held pending the outcome of a dispute.
+    #[must_use]
     pub fn held(&self) -> Amount {
         self.held
     }
 
     /// Funds that are either available or held.
+    #[must_use]
     pub fn total(&self) -> Amount {
         // The saturation is unreachable: every mutation rejects a change whose
         // resulting total is not representable, so the sum always fits. It is
@@ -63,6 +68,7 @@ impl Account {
     }
 
     /// Whether the account is frozen, which happens on a chargeback.
+    #[must_use]
     pub fn is_locked(&self) -> bool {
         self.locked
     }

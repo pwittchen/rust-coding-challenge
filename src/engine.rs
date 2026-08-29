@@ -52,6 +52,7 @@ pub struct Engine {
 
 impl Engine {
     /// Creates an engine with no clients and no history.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -75,6 +76,7 @@ impl Engine {
     }
 
     /// The state of every account the engine has seen, ordered by client ID.
+    #[must_use]
     pub fn accounts(&self) -> impl ExactSizeIterator<Item = &Account> {
         self.accounts.values()
     }
@@ -228,7 +230,7 @@ impl Engine {
 /// fraction they did not send.
 fn usable_amount(amount: Option<Amount>) -> Option<Amount> {
     amount
-        .filter(|amount| amount.is_sign_positive())
+        .filter(Amount::is_sign_positive)
         .map(|amount| amount.trunc_with_scale(SCALE))
 }
 

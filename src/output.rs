@@ -54,6 +54,11 @@ fn format_amount(value: Amount) -> String {
 ///
 /// The header is always written, so the output is a well-formed CSV even when
 /// there are no accounts to report.
+///
+/// # Errors
+///
+/// Fails if `writer` refuses a row or cannot be flushed — a closed pipe or a
+/// full disk, say.
 pub fn write_accounts<'a, W, I>(writer: W, accounts: I) -> csv::Result<()>
 where
     W: Write,

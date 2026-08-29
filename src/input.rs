@@ -42,6 +42,8 @@ pub fn read_transactions<R: Read>(source: R) -> impl Iterator<Item = csv::Result
 
 /// Streams the transactions from the CSV file at `path`.
 ///
+/// # Errors
+///
 /// Fails if the file cannot be opened; a malformed record surfaces later, as an
 /// error item of the returned iterator.
 pub fn read_transactions_from_path(

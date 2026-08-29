@@ -145,6 +145,7 @@ pub struct TransactionRecord {
 
 impl TransactionRecord {
     /// Records a newly processed transaction that is not yet disputed.
+    #[must_use]
     pub fn new(client: ClientId, amount: Amount) -> Self {
         Self {
             client,
