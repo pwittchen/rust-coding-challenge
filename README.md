@@ -447,3 +447,13 @@ each decision, in `src/engine.rs`:
 Anything the engine cannot apply is ignored and processing continues, as the
 specification requires. A malformed CSV record, on the other hand, aborts the
 run: it means the input itself cannot be trusted.
+
+## Prompt log
+
+This project was written with the help of Claude Code, and
+[`PROMPTS.md`](PROMPTS.md) is the record of that: every prompt that asked for a
+change to the repository, verbatim and in order, each one stamped with the date
+and time it was given. Read end to end, it is the history of how the engine was
+built — the features asked for, the corrections, and the reasoning that led to
+the decisions documented above. The git history says what changed; the prompt
+log says what was asked for.

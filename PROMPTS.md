@@ -220,3 +220,7 @@ update /score CC skill so it find only the critical and important issues and jus
 ## 2026-08-29 16:12:21
 
 /commit
+
+## 2026-08-29 16:37:18
+
+add reference to PROMPTS.md in the README.md describing what it is
