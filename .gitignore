@@ -28,3 +28,6 @@ target
 # Challenge brief and any derivative of it — must never be committed
 *.pdf
 SPEC.md
+
+# Output file - may change during running the program
+accounts.csv

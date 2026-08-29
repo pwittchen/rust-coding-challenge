@@ -54,3 +54,11 @@ According to the SPEC.md, define all necessary data structures which are needed 
 ## 2026-08-29 12:45:07
 
 /commit
+
+## 2026-08-29 12:51:11
+
+Now, implement logic of loading transactions.csv file into the program, ensure you keep the contract described in the SPEC.md. Do not apply any logic yet. Just implement loading transactions from the file into the program. Keep csv file loading logic in the separate file to not mix it with the currently existing transactions.rs file to keep separation of the program responsibilities clear. Right now, due to the fact that transaction logic is not imeplement or being implemented yet, output empty accounts.csv file when user runs the program, but inside the program load all the transactions to the data structure.
+
+## 2026-08-29 12:54:22
+
+/commit
