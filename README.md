@@ -149,7 +149,10 @@ transaction that is not under dispute, that was already settled, or that belongs
 to somebody else; a chargeback that freezes the account and leaves the total
 negative; and further transactions arriving on a frozen account. The boundaries
 are covered too: the largest client and transaction IDs, four-decimal precision,
-amounts finer than that, and balances that would overflow. One test runs the
+amounts finer than that, an amount with more significant digits than a float
+could hold — which is read and kept exactly — and balances that would overflow.
+One test runs two engines on two threads, which is what a server serving many
+streams at once would do. One test runs the
 sample input above and asserts the report documented for it, so the example and
 the code cannot drift apart.
 
@@ -221,12 +224,55 @@ dispute any earlier deposit. And the CSV reader imposes no limit on the size of
 a single field, so one absurdly long field could still allocate. In a server
 taking these streams from the network, both would be addressed outside the
 engine — a cap on the record size at the edge, and a persistent, ageing-out
-store behind the history — rather than by changing the transaction logic.
+store behind the history — rather than by changing the transaction logic. What
+the engine costs in practice is measured under [Efficiency](#efficiency) below.
 
-The engine holds no global or shared mutable state: it is an ordinary value
-that owns its accounts, and reading is generic over `Read` rather than tied to
-a file. Many streams can therefore be processed at once, each with its own
-engine, without any locking.
+## Efficiency
+
+**The input is a stream, not a data structure.** The CSV reader decodes one
+record at a time into a buffer it reuses, `main` applies each record as it
+arrives, and the report is written at the end from the accounts alone. Nothing
+ever holds the input, or a collection derived from it, in full — so the size of
+the file is not a bound on memory, and a 100 GB file is no different from a 100
+KB one.
+
+**Memory tracks what can still be disputed, not what has been read.** The engine
+keeps one account per client — at most `u16::MAX` of them, 36 bytes each — and
+one 20-byte record per applied deposit, holding only the client, the amount, and
+where the deposit stands in the dispute lifecycle. Withdrawals are not retained
+at all, since nothing can refer back to one. Two runs over inputs of the same
+size show the difference:
+
+| Input (5 million records, ~137 MB) | Time | Peak memory |
+| --- | --- | --- |
+| Withdrawals only — nothing is disputable | 1.0 s | 7 MB |
+| 55% deposits — 2.75 million disputable records | 1.4 s | 216 MB |
+
+Measured on an M4 Max with a release build; the same runs take 2.1 s through
+`cargo run`. The second row is the honest worst case: the history is what a
+dispute needs to refer back to, and transaction IDs are `u32`, so a stream of
+distinct deposits can grow it to `u32::MAX` records. That growth is inherent in
+the feature, not in the implementation, which is why the record is kept as small
+as it is.
+
+**Amounts are read from the digits, not guessed at.** Left to itself, the CSV
+reader decides what each field looks like and hands a numeric-looking one over
+as an `f64`, which would both round amounts on the way in — `123456789012345.6789`
+came back as `123456789012345.67` — and cost time inferring a type per field.
+The amount column is therefore decoded straight from its text
+([`src/transaction.rs`](src/transaction.rs)), which is exact and cut about 20%
+off the total runtime.
+
+**One engine per stream, no shared state.** The engine is an ordinary value that
+owns its accounts and its history; there is no global, no lock, and no shared
+mutability anywhere in the crate. Reading is generic over `Read`, so the same
+code path serves a file, a socket, or a test fixture. A server taking thousands
+of concurrent streams gives each one its own engine and runs them in parallel
+with no coordination at all — a unit test in [`src/engine.rs`](src/engine.rs)
+does exactly that across threads. Since memory is per-stream, the bound worth
+watching in that setting is the disputable history summed over the live streams;
+as noted above, a server would put a persistent, ageing-out store behind it
+rather than change the transaction logic.
 
 ## Project layout
 

@@ -776,6 +776,32 @@ mod tests {
     }
 
     #[test]
+    fn processes_separate_streams_on_separate_threads() {
+        // An engine owns everything it touches and shares nothing, so a server
+        // can give one to each of the streams it is serving at the same time.
+        let inputs = [
+            "type,client,tx,amount\ndeposit,1,1,1.0\n",
+            "type,client,tx,amount\ndeposit,1,1,2.0\ndispute,1,1,\n",
+        ];
+
+        let balances: Vec<_> = std::thread::scope(|scope| {
+            let workers: Vec<_> = inputs
+                .iter()
+                .map(|input| scope.spawn(|| account(&engine(input), 1)))
+                .collect();
+
+            workers
+                .into_iter()
+                .filter_map(|worker| worker.join().ok())
+                .collect()
+        });
+
+        assert_eq!(balances.len(), 2);
+        assert_eq!(balances[0].available(), Decimal::ONE);
+        assert_eq!(balances[1].held(), Decimal::TWO);
+    }
+
+    #[test]
     fn accepts_the_largest_client_and_transaction_ids() {
         let engine = engine(
             "type,client,tx,amount\n\
