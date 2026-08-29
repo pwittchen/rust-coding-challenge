@@ -816,6 +816,158 @@ mod tests {
         assert_eq!(balances[1].held(), Decimal::TWO);
     }
 
+    /// A deterministic generator, so the stream below is arbitrary in shape but
+    /// identical on every run: a failure is reproducible rather than a puzzle.
+    ///
+    /// It is a plain xorshift, written here rather than pulled in, because a
+    /// dependency added for one test would have to be justified to a reviewer
+    /// and this is a dozen lines.
+    struct Rng(u64);
+
+    impl Rng {
+        /// The next value, masked to the bits the caller wants. Every mask used
+        /// below is all-ones, so the result is uniform over `0..=mask`.
+        fn bits(&mut self, mask: u64) -> u64 {
+            let mut state = self.0;
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            self.0 = state;
+
+            state & mask
+        }
+    }
+
+    #[test]
+    fn keeps_the_balances_consistent_over_an_arbitrary_stream() {
+        // The cases above each pin down one rule. This one asserts what has to
+        // hold no matter which rules a stream happens to trigger, over a mix
+        // that no hand-written case would think to arrange: disputes landing on
+        // spent deposits, chargebacks freezing accounts mid-dispute, resolves
+        // arriving after a freeze, references to transactions that never
+        // existed.
+        const ROWS: usize = 4_000;
+
+        let mut rng = Rng(0x5eed_1234_5678_9abc);
+        let mut input = String::from("type,client,tx,amount\n");
+        let mut deposits: Vec<(TxId, ClientId)> = Vec::new();
+        let mut deposited = Amount::ZERO;
+
+        for row in 1..=ROWS {
+            let client = ClientId::try_from(rng.bits(0xff)).unwrap_or(0);
+            let minor = i64::try_from(rng.bits(0xffff)).unwrap_or(0);
+            let amount = Decimal::new(minor, SCALE);
+            let tx = TxId::try_from(row).unwrap_or(0);
+
+            // One of the last few hundred deposits to refer back to — recent
+            // ones, so that disputes, resolves and chargebacks pile up on the
+            // same transactions and actually reach the later states. Early on
+            // there are not that many yet, and the reference is to nothing,
+            // which is a case the engine has to survive just as well.
+            let pick = usize::try_from(rng.bits(0x1ff)).unwrap_or(0);
+            let (referenced_client, referenced_tx) = match deposits.iter().rev().nth(pick) {
+                Some(&(tx, owner)) => (owner, tx),
+                None => (client, TxId::try_from(pick).unwrap_or(0)),
+            };
+
+            match rng.bits(0xf) {
+                0..=4 => {
+                    input.push_str(&format!("deposit,{client},{tx},{amount}\n"));
+                    deposits.push((tx, client));
+                    deposited = deposited
+                        .checked_add(amount)
+                        .expect("the deposits should add up to a representable amount");
+                }
+                5..=9 => input.push_str(&format!("withdrawal,{client},{tx},{amount}\n")),
+                roll => {
+                    let kind = match roll {
+                        10..=13 => "dispute",
+                        14 => "resolve",
+                        _ => "chargeback",
+                    };
+
+                    input.push_str(&format!("{kind},{referenced_client},{referenced_tx},\n"));
+                }
+            }
+        }
+
+        /// The money the engine is holding across every account it has opened.
+        fn funds(engine: &Engine) -> Amount {
+            engine.accounts().fold(Amount::ZERO, |sum, account| {
+                sum.checked_add(account.total())
+                    .expect("the totals should add up to a representable amount")
+            })
+        }
+
+        // Applied one at a time, so that the invariants can be checked against
+        // each transaction rather than only against where the stream ends up.
+        let mut engine = Engine::new();
+        let mut before = Amount::ZERO;
+
+        for transaction in read_transactions(input.as_bytes()) {
+            let transaction = transaction.expect("input should be readable");
+            engine.apply(&transaction);
+            let after = funds(&engine);
+
+            // What each kind of transaction is allowed to do to the money in
+            // the engine. A dispute and a resolve move funds between available
+            // and held, which is not money arriving or leaving, so the sum must
+            // come out exactly where it went in — the invariant that fails on a
+            // hold that forgets to debit the available funds, on a release with
+            // the wrong sign, or on a claim applied twice. Every kind is also
+            // allowed to do nothing, which is what an unapplicable transaction
+            // does.
+            let allowed = match transaction.kind {
+                TransactionType::Deposit => after >= before,
+                TransactionType::Withdrawal | TransactionType::Chargeback => after <= before,
+                TransactionType::Dispute | TransactionType::Resolve => after == before,
+            };
+            assert!(
+                allowed,
+                "{:?} of {:?} moved the funds from {before} to {after}",
+                transaction.kind, transaction.tx
+            );
+
+            assert!(
+                engine
+                    .accounts()
+                    .all(|account| account.held() >= Amount::ZERO),
+                "held funds never go negative"
+            );
+
+            before = after;
+        }
+
+        let accounts: Vec<_> = engine.accounts().collect();
+        assert!(!accounts.is_empty(), "the stream should open some accounts");
+        let total = before;
+
+        // The engine can lose money — a chargeback reverses a deposit, and may
+        // take the balance below zero — but it can never create any: no sequence
+        // of transactions leaves the clients holding more than was paid in.
+        assert!(
+            total <= deposited,
+            "the engine held {total} against {deposited} deposited"
+        );
+
+        // The stream has to have reached the states the invariants are about,
+        // or they would hold for uninteresting reasons.
+        assert!(
+            accounts.iter().any(|account| account.is_locked()),
+            "some account should have been frozen by a chargeback"
+        );
+        assert!(
+            accounts.iter().any(|account| account.held() > Amount::ZERO),
+            "some account should have funds held for an open dispute"
+        );
+        assert!(
+            accounts
+                .iter()
+                .any(|account| account.available() < Amount::ZERO),
+            "some dispute should have driven an account's available funds negative"
+        );
+    }
+
     #[test]
     fn accepts_the_largest_client_and_transaction_ids() {
         let engine = engine(

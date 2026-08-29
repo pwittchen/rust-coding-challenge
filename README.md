@@ -171,7 +171,18 @@ balances that would overflow, and
 the largest balance an account can hold, both rendered directly and reached
 through a chargeback that drives it negative, since a balance the engine accepts
 but the report cannot print would be a failure on the last line of an otherwise
-successful run. One test runs two engines on two threads, which is what a server
+successful run.
+
+Those cases each pin down one rule. One further test asserts what has to hold
+whichever rules a stream happens to trigger: it generates four thousand
+transactions from a small deterministic generator — deposits, withdrawals and
+claims piling up on the same recent transactions — applies them one at a time,
+and after every single one checks that a dispute or a resolve has left the money
+in the engine exactly where it was, that a deposit has not reduced it and a
+withdrawal or chargeback has not increased it, and that no account is holding a
+negative amount. It is the mix no hand-written case would think to arrange, and
+it fails on a hold that forgets to debit the available funds or a release with
+the wrong sign. One test runs two engines on two threads, which is what a server
 serving many streams at once would do. One test runs the sample input above and
 asserts the report documented for it, so the example and the code cannot drift
 apart, and the example on the crate's own documentation is compiled and run as a
