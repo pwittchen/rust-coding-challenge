@@ -102,8 +102,9 @@ fixes are a separate, explicit request.
 
 ## Prompt log
 
-Every prompt the user writes must be appended verbatim to `PROMPTS.md` at the
-repo root, as a new entry at the end of the file, in the form:
+Every prompt that asks for a change to the project must be appended verbatim to
+`PROMPTS.md` at the repo root, as a new entry at the end of the file, in the
+form:
 
 ```markdown
 ## YYYY-MM-DD HH:MM:SS
@@ -111,10 +112,22 @@ repo root, as a new entry at the end of the file, in the form:
 <the user's message, verbatim>
 ```
 
-Do this as part of handling the prompt (before or alongside the actual work),
-for every prompt — including short follow-ups, corrections, and one-word
-replies. Get the timestamp from `date "+%Y-%m-%d %H:%M:%S"` rather than
-guessing it.
+Do this as part of handling the prompt (before or alongside the actual work).
+Get the timestamp from `date "+%Y-%m-%d %H:%M:%S"` rather than guessing it.
+
+**What to log:** prompts that lead to modifying the repository — its sources,
+tests, documentation, configuration, skills, or commits. This includes short
+follow-ups, corrections and one-word replies that steer such a change (for
+example "yes", "revert that", or `/commit`).
+
+**What not to log:** prompts that only ask about the project without asking for
+a change — questions about how the code works, requests to explain, review,
+score or summarize something, and anything else answered purely by reading. If
+a question turns into a change request later, log the prompt that asks for the
+change, not the question that preceded it.
+
+When a prompt is ambiguous, judge by what it makes you do: if the turn ends
+with the working tree untouched, it was a question and stays out of the log.
 
 ## Commits
 

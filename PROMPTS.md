@@ -154,3 +154,11 @@ create score CC skill which will evalue project quality according to the points 
 ## 2026-08-29 15:06:29
 
 /commit
+
+## 2026-08-29 15:08:32
+
+In the CLAUDE.md there's an info about prompt log. Modify it, so when the user asks question about the project without intention of the modifying it, then prompt should not be logged into the file. Only prompts related to modification of the project, its source, tests and documenations should be logged. Pure questions should not be loggged.
+
+## 2026-08-29 15:09:10
+
+/commit
