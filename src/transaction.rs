@@ -29,8 +29,7 @@ pub type Amount = Decimal;
 pub const SCALE: u32 = 4;
 
 /// The kind of a transaction, taken from the `type` column.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TransactionType {
     /// Credit to the client's account: increases available and total funds.
     Deposit,
@@ -42,6 +41,57 @@ pub enum TransactionType {
     Resolve,
     /// Reversal of a disputed transaction; removes held funds and locks the account.
     Chargeback,
+}
+
+impl TransactionType {
+    /// The spellings the `type` column is matched against, in the case the
+    /// specification writes them.
+    const NAMES: [(&'static str, Self); 5] = [
+        ("deposit", Self::Deposit),
+        ("withdrawal", Self::Withdrawal),
+        ("dispute", Self::Dispute),
+        ("resolve", Self::Resolve),
+        ("chargeback", Self::Chargeback),
+    ];
+
+    /// The names above alone, for the error a row with any other type produces.
+    const EXPECTED: &'static [&'static str] =
+        &["deposit", "withdrawal", "dispute", "resolve", "chargeback"];
+}
+
+/// Reads the transaction type without regard to how it is capitalized.
+///
+/// The specification spells the five types in lower case, and a run is aborted
+/// when a row names a type that is not one of them — so the way the type is
+/// matched decides what counts as unintelligible input. Matching it exactly
+/// would put `Deposit` in that class, which is the wrong call: the row says
+/// plainly what it is, capitalization is not a dimension the format assigns any
+/// meaning to, and a single such row would otherwise cost the whole file. A type
+/// that is not one of the five is still an error, and still ends the run.
+impl<'de> Deserialize<'de> for TransactionType {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct TransactionTypeVisitor;
+
+        impl Visitor<'_> for TransactionTypeVisitor {
+            type Value = TransactionType;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a transaction type")
+            }
+
+            fn visit_str<E: de::Error>(self, value: &str) -> Result<Self::Value, E> {
+                let value = value.trim();
+
+                TransactionType::NAMES
+                    .into_iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case(value))
+                    .map(|(_, kind)| kind)
+                    .ok_or_else(|| E::unknown_variant(value, TransactionType::EXPECTED))
+            }
+        }
+
+        deserializer.deserialize_str(TransactionTypeVisitor)
+    }
 }
 
 /// A single row of the input CSV.
@@ -208,6 +258,26 @@ mod tests {
                 tx: 3,
                 amount: None,
             }]
+        );
+    }
+
+    #[test]
+    fn parses_a_transaction_type_however_it_is_capitalized() {
+        let transactions = parse(
+            "type, client, tx, amount\n\
+             Deposit, 1, 1, 1.0\n\
+             WITHDRAWAL, 1, 2, 1.0\n\
+             ChargeBack, 1, 1,\n",
+        );
+
+        let kinds: Vec<_> = transactions.iter().map(|t| t.kind).collect();
+        assert_eq!(
+            kinds,
+            vec![
+                TransactionType::Deposit,
+                TransactionType::Withdrawal,
+                TransactionType::Chargeback,
+            ]
         );
     }
 

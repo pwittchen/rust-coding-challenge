@@ -166,7 +166,8 @@ to somebody else; a chargeback that freezes the account and leaves the total
 negative; and further transactions arriving on a frozen account. The boundaries
 are covered too: the largest client and transaction IDs, four-decimal precision,
 amounts finer than that, an amount with more significant digits than a float
-could hold — which is read and kept exactly — balances that would overflow, and
+could hold — which is read and kept exactly — a type in any capitalization,
+balances that would overflow, and
 the largest balance an account can hold, both rendered directly and reached
 through a chargeback that drives it negative, since a balance the engine accepts
 but the report cannot print would be a failure on the last line of an otherwise
@@ -242,6 +243,14 @@ a client ID that does not fit a `u16`, an amount that is not a decimal: the
 input is not what it claims to be, so nothing after that point can be trusted
 either. The run stops with a message on stderr naming the file, the line, and
 what was wrong with it, and exits non-zero.
+
+Because that rule is strict, what falls under it matters, and the line is drawn
+at rows whose meaning cannot be recovered rather than at rows that are merely
+untidy. Surrounding whitespace, a field beyond the four columns, and the
+capitalization of the `type` column are all tolerated: `Deposit` says plainly
+what it is, the format assigns no meaning to its case, and rejecting it would
+cost the whole file for nothing. A type that is not one of the five is a
+different matter, and still ends the run.
 
 The report is written only after the whole input has been consumed, so a run
 that fails writes **nothing** to stdout — a partial report can never be
@@ -401,6 +410,12 @@ each decision, in `src/engine.rs`:
 - **A deposit or withdrawal without an amount, or with a negative one, is
   ignored.** A negative deposit is a withdrawal in disguise, and would bypass
   the check that the available funds cover it.
+- **The `type` column is read without regard to its capitalization.** The
+  specification spells the five types in lower case, and any other word ends the
+  run — so where that line falls decides what counts as unintelligible input.
+  `Deposit` is not unintelligible: the case of the word carries no meaning in
+  this format, and treating it as a malformed record would discard an entire
+  file over a spelling the row itself makes unambiguous.
 - **An amount carrying more than four decimal places is cut to four**, not
   rounded. The input is specified to carry no more than four, so this only bites
   on a malformed row. Cutting it keeps every balance exactly as precise as the

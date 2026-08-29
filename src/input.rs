@@ -172,7 +172,6 @@ mod tests {
         // cannot be trusted, so the run is aborted instead.
         for row in [
             "teleport, 1, 1, 1.0",  // unknown transaction type
-            "Deposit, 1, 1, 1.0",   // the type is not spelled in lower case
             "deposit, 65536, 1, 1", // client ID beyond u16
             "deposit, 1, -1, 1.0",  // transaction ID beyond u32
             "deposit, 1, , 1.0",    // no transaction ID
