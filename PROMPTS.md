@@ -78,3 +78,11 @@ According to the description in the SPEC.md implement transaction logic. Keep al
 ## 2026-08-29 14:06:06
 
 /commit
+
+## 2026-08-29 14:08:13
+
+create README.md file with brief description of the program, information how to build it, format it, execute tests and run with sample transaction process. Also add info about project prerequisites needed to build and run the program.
+
+## 2026-08-29 14:09:21
+
+/commit
