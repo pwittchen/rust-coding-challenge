@@ -173,8 +173,9 @@ run cargo lint command and apply fixes found by this command
 
 ## 2026-08-29 15:28:46
 
-/commit
 /score
+
+/commit
 
 ## 2026-08-29 15:34:54
 
@@ -187,6 +188,7 @@ apply fixes for the found issues
 ## 2026-08-29 15:45:49
 
 /score
+
 /commit
 
 ## 2026-08-29 15:46:58
@@ -196,6 +198,7 @@ document cargo lint alias in the README.md
 ## 2026-08-29 15:55:30
 
 /score
+
 apply prioritized fixes from the report
 
 ## 2026-08-29 16:04:03
