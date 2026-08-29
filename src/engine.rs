@@ -9,9 +9,7 @@
 //! disputed, who may raise one, what a frozen account still accepts, what a
 //! repeated transaction ID means. Each is resolved the way a bank would resolve
 //! it, and the reasoning sits on the method that implements it rather than in a
-//! list here — one place to read it, and one place to change it, found by
-//! whoever is reading the code it governs. The README's "Assumptions" section
-//! gathers them for a reader who wants them together.
+//! list here. The README's "Assumptions" section gathers them together.
 //!
 //! Anything the engine cannot apply — an unknown transaction ID, a resolve for
 //! a transaction that is not under dispute, a withdrawal that is not covered —
@@ -109,10 +107,8 @@ impl Engine {
     ///
     /// Like a deposit, a withdrawal names the client it is for, so it opens
     /// their account even when it cannot be applied: the client exists as far as
-    /// the input is concerned, and an attempt to move money they do not have
-    /// leaves them with an empty account rather than with none at all. Disputes,
-    /// resolves and chargebacks never open an account, because they only ever
-    /// refer back to a transaction whose client already has one.
+    /// the input is concerned. Disputes, resolves and chargebacks never open an
+    /// account, because they refer back to a transaction whose client has one.
     fn withdraw(&mut self, client: ClientId, amount: Option<Amount>) {
         let account = self.account(client);
 
@@ -129,17 +125,15 @@ impl Engine {
 
     /// Holds the funds of the disputed deposit.
     ///
-    /// Only deposits are disputable. The specification defines a dispute as
-    /// moving funds from available to held, which only makes sense for money
-    /// that was paid in: holding the amount of a withdrawal would take funds the
-    /// client never received. A dispute over a withdrawal is therefore treated
-    /// like a dispute over an unknown transaction and ignored.
+    /// Only deposits are disputable. A dispute moves funds from available to
+    /// held, which only makes sense for money that was paid in: holding the
+    /// amount of a withdrawal would take funds the client never received. A
+    /// dispute over one is treated like a dispute over an unknown transaction.
     ///
     /// The available funds may go negative, when the deposit under dispute has
     /// already been spent. That is deliberate: the total must not change, so the
-    /// held amount has to come out of the available funds whether they cover it
-    /// or not, leaving the client owing the difference — exactly what a bank
-    /// does with a claimed-back payment.
+    /// held amount comes out of the available funds whether they cover it or
+    /// not, leaving the client owing the difference.
     fn dispute(&mut self, client: ClientId, tx: TxId) {
         let Some((account, record)) = self.disputable(client, tx) else {
             return;
@@ -180,10 +174,9 @@ impl Engine {
     /// account is frozen.
     ///
     /// Freezing therefore strands the funds of any dispute that was still open
-    /// when the chargeback landed: nothing can resolve them afterwards, and they
-    /// stay held. That is the intended reading of a freeze — the account stops
-    /// settling anything until a human looks at it, and money in the middle of a
-    /// claim is exactly what should not move on its own in the meantime.
+    /// when the chargeback landed: nothing can resolve them afterwards. That is
+    /// the intended reading of a freeze — money in the middle of a claim is
+    /// exactly what should not move on its own until a human looks at it.
     fn disputable(
         &mut self,
         client: ClientId,
@@ -219,19 +212,14 @@ impl Engine {
 /// negative deposit is a withdrawal in disguise, and would bypass the check that
 /// available funds cover it.
 ///
-/// An amount of zero is neither, and is applied. It moves no money, but a
-/// deposit of zero is still a deposit: it takes its transaction ID, and a
-/// dispute may later refer back to it and hold nothing. The comparison is
-/// against zero rather than a test of the sign, so that a zero the input spells
-/// `-0.0` is treated as the zero it is and not as a negative amount.
+/// An amount of zero is neither, and is applied: it moves no money, but it still
+/// takes its transaction ID. The comparison is against zero rather than a test
+/// of the sign, so a `-0.0` is treated as the zero it is.
 ///
-/// Anything past the fourth decimal place is dropped rather than rounded. The
-/// input is specified to carry no more than four, so this only bites on a
-/// malformed row, and cutting the excess keeps every balance exactly as precise
-/// as the report that prints it — otherwise a fraction too small to show could
-/// still be counted, and the reported `available` and `held` would no longer add
-/// up to the reported `total`. Dropping it also never credits a client a
-/// fraction they did not send.
+/// Anything past the fourth decimal place is dropped rather than rounded, which
+/// only bites on a malformed row. Cutting it keeps every balance exactly as
+/// precise as the report that prints it, so the reported `available` and `held`
+/// always add up to the reported `total`.
 fn usable_amount(amount: Option<Amount>) -> Option<Amount> {
     amount
         .filter(|amount| *amount >= Amount::ZERO)

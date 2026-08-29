@@ -17,11 +17,9 @@ use rust_coding_challenge::{input, output};
 
 /// Runs the engine, reporting any failure on stderr.
 ///
-/// Every error the program can hit — a wrong invocation, an unreadable file, a
-/// record that will not parse, a report that cannot be written — arrives here as
-/// a value and ends the run with a message and a non-zero status. Nothing
-/// panics, so a failed run is never a backtrace and never a half-written report
-/// that looks like a whole one.
+/// Every error the program can hit arrives here as a value and ends the run with
+/// a message and a non-zero status. Nothing panics, so a failed run is never a
+/// backtrace.
 fn main() -> ExitCode {
     if let Err(error) = run() {
         eprintln!("error: {error}");
@@ -47,9 +45,8 @@ fn run() -> Result<(), Box<dyn Error>> {
         engine.apply(&transaction.map_err(describe)?);
     }
 
-    // A report that could not be written in full — a full disk, a closed pipe —
-    // is an error rather than a silent truncation, so that a partial report is
-    // never mistaken for the account state.
+    // A report that could not be written in full is an error rather than a
+    // silent truncation, so a partial report is never mistaken for the state.
     output::write_accounts(io::stdout().lock(), engine.accounts())
         .map_err(|error| format!("could not write the report: {error}"))?;
 
@@ -58,9 +55,8 @@ fn run() -> Result<(), Box<dyn Error>> {
 
 /// Returns the input file, the first and only argument to the binary.
 ///
-/// A second argument is rejected rather than ignored: it means the invocation
-/// does not say what it looks like it says, and silently dropping it could send
-/// the report of the wrong file downstream.
+/// A second argument is rejected rather than ignored: silently dropping it could
+/// send the report of the wrong file downstream.
 fn input_path<I: IntoIterator<Item = OsString>>(arguments: I) -> Result<PathBuf, Box<dyn Error>> {
     const USAGE: &str = "expected the input CSV as the only argument";
 

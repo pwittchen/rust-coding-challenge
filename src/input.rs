@@ -16,14 +16,10 @@ use crate::transaction::Transaction;
 ///
 /// Accepting a short row means accepting a long one too: the flexible reader
 /// stops checking the width of a row in either direction, so a trailing field
-/// beyond `amount` is dropped rather than rejected. That is the right way round
-/// for this program. A row is refused when it cannot be understood — a missing
-/// `tx`, an unknown type, an amount that is not a decimal — and every one of the
-/// four columns the format defines is still required by name and still parsed,
-/// so a row carrying something extra alongside them is not ambiguous, merely
-/// wider than it needs to be. The header, on the other hand, has to name all
-/// four columns: it is what the fields are read by, so a missing one is not
-/// extra material but a row whose meaning cannot be recovered.
+/// beyond `amount` is dropped rather than rejected. All four columns are still
+/// required by name and still parsed, so an extra field is not ambiguous. The
+/// header, on the other hand, has to name all four: it is what the fields are
+/// read by.
 fn builder() -> ReaderBuilder {
     let mut builder = ReaderBuilder::new();
     builder.trim(Trim::All).flexible(true);

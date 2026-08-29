@@ -61,13 +61,10 @@ impl TransactionType {
 
 /// Reads the transaction type without regard to how it is capitalized.
 ///
-/// The specification spells the five types in lower case, and a run is aborted
-/// when a row names a type that is not one of them — so the way the type is
-/// matched decides what counts as unintelligible input. Matching it exactly
-/// would put `Deposit` in that class, which is the wrong call: the row says
-/// plainly what it is, capitalization is not a dimension the format assigns any
-/// meaning to, and a single such row would otherwise cost the whole file. A type
-/// that is not one of the five is still an error, and still ends the run.
+/// A row naming a type that is not one of the five aborts the run, so how the
+/// type is matched decides what counts as unintelligible input. `Deposit` is not
+/// unintelligible: the format assigns no meaning to the case of the word, and
+/// rejecting it would cost the whole file for nothing.
 impl<'de> Deserialize<'de> for TransactionType {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         struct TransactionTypeVisitor;
@@ -115,24 +112,18 @@ pub struct Transaction {
 
 /// Reads an amount from the text of the field, and from nothing else.
 ///
-/// Without this, the field is decoded by asking the CSV reader what the value
-/// looks like, and a value that looks like a number is handed over as an `f64` —
-/// which is exactly the conversion the fixed-point type exists to avoid, and
-/// would silently round an amount such as `123456789012345.6789` on the way in.
-/// Reading the digits directly keeps every amount exact, and is also markedly
-/// faster than having the reader guess the type of every field first.
+/// Without this, the CSV reader guesses what the value looks like and hands a
+/// numeric-looking one over as an `f64`, silently rounding an amount such as
+/// `123456789012345.6789`. Reading the digits directly keeps every amount exact,
+/// and is markedly faster than inferring a type per field.
 ///
-/// An empty field, or a row that stops before this column, is not an amount but
-/// the absence of one: disputes, resolves and chargebacks carry no amount.
+/// An empty field, or a row that stops before this column, is the absence of an
+/// amount: disputes, resolves and chargebacks carry none.
 ///
-/// An amount with more digits than a decimal can hold is rejected here, and ends
-/// the run — unlike a balance that grows beyond what a decimal can hold, which
-/// [`Account`](crate::account::Account) refuses while the run continues. The two
-/// are the same size but not the same kind of problem: a figure this reader
-/// cannot represent is a row it cannot understand, and the rule for those is that
-/// the input is not what it claims to be, whereas a balance that cannot take
-/// another deposit is an account that is full, which is an outcome rather than a
-/// misunderstanding.
+/// An amount with more digits than a decimal can hold ends the run — a figure
+/// the reader cannot represent is a row it cannot understand — unlike a balance
+/// that grows past the same limit, which
+/// [`Account`](crate::account::Account) refuses while the run continues.
 fn deserialize_amount<'de, D: Deserializer<'de>>(
     deserializer: D,
 ) -> Result<Option<Amount>, D::Error> {
@@ -223,8 +214,6 @@ impl TransactionRecord {
 /// one of the faster ones that suit a `u32` key. Transaction IDs are chosen by
 /// whoever sends the input, so a faster hasher would let a hostile partner pick
 /// IDs that all land in one bucket and turn every lookup into a linear scan.
-/// Paying for a hash that cannot be gamed is the right trade for an engine meant
-/// to survive a stream it does not control.
 pub type Transactions = HashMap<TxId, TransactionRecord>;
 
 #[cfg(test)]

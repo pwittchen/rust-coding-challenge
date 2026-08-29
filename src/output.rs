@@ -36,23 +36,19 @@ impl From<&Account> for AccountReport {
 /// Renders an amount with the precision required by the output format.
 ///
 /// The amount is formatted here rather than left to the serializer, which drops
-/// trailing zeros, so that every balance is reported with the same four decimal
-/// places no matter how it was arrived at. Nothing is lost in the process: the
-/// engine already holds every balance at this scale.
+/// trailing zeros, so every balance is reported with the same four decimal
+/// places. The engine already holds every balance at this scale, so nothing is
+/// lost.
 ///
 /// The digits are laid out by hand rather than by asking the decimal for a fixed
-/// number of places. Given a precision, its formatter builds the text in a
-/// fixed 32-byte buffer and panics when the result does not fit — which it does
-/// not for a balance of 28 or more integer digits, since four forced decimals
-/// and the point push it past the buffer. Rendering without a precision is
-/// sized by the mantissa and cannot overflow, so the fraction is padded, or cut,
-/// to the reported scale here instead. Balances are held at that scale already,
-/// so in practice this only ever pads.
+/// precision: given one, its formatter builds the text in a fixed 32-byte buffer
+/// and panics when the result does not fit, which it does not for a balance of
+/// 28 or more integer digits. Rendering without a precision is sized by the
+/// mantissa and cannot overflow, so the fraction is padded here instead.
 ///
-/// A balance that lands on exactly zero is reported as a positive zero. The
-/// decimal keeps a sign of its own, so subtracting a zero amount — holding the
-/// funds of a deposit too small to register, say — leaves a negative zero
-/// behind, and `-0.0000` is not a balance any reader of the report expects.
+/// A balance that lands on exactly zero is reported as a positive zero: the
+/// decimal keeps a sign of its own, so subtracting a zero amount leaves a
+/// negative zero behind, and `-0.0000` is not a balance a reader expects.
 fn format_amount(value: Amount) -> String {
     let value = if value.is_zero() { Amount::ZERO } else { value };
 

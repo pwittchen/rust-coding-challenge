@@ -15,9 +15,8 @@ use crate::transaction::{Amount, ClientId};
 /// and that all three amounts stay representable.
 ///
 /// Every operation that moves money returns whether it did: `true` when the
-/// balances changed, `false` when the operation was refused and the account was
-/// left exactly as it was. There is no third outcome — an operation never
-/// half-applies — so the caller can act on the answer as a plain yes or no.
+/// balances changed, `false` when it was refused and the account was left
+/// exactly as it was. An operation never half-applies.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Account {
     client: ClientId,
@@ -60,10 +59,9 @@ impl Account {
     #[must_use]
     pub fn total(&self) -> Amount {
         // The saturation is unreachable: every mutation rejects a change whose
-        // resulting total is not representable, so the sum always fits. It is
-        // written as a checked operation regardless, so that the guarantee is
-        // the compiler's rather than this comment's — a plain `+` on a decimal
-        // panics on overflow, which is the one thing this crate must never do.
+        // total is not representable. It is written as a checked operation
+        // regardless, so the guarantee is the compiler's rather than this
+        // comment's — a plain `+` on a decimal panics on overflow.
         self.available.saturating_add(self.held)
     }
 
@@ -80,9 +78,8 @@ impl Account {
 
     /// Debits `amount` from the available funds, unless they do not cover it.
     ///
-    /// The engine has nothing to do when a withdrawal is refused — the
-    /// specification says to ignore it — so this is the one operation whose
-    /// answer the caller may drop.
+    /// A refused withdrawal is simply ignored, so this is the one operation
+    /// whose answer the caller may drop.
     pub(crate) fn withdraw(&mut self, amount: Amount) -> bool {
         self.available >= amount && self.shift(-amount, Decimal::ZERO)
     }
@@ -110,8 +107,8 @@ impl Account {
     /// Adds the two deltas to the respective balances.
     ///
     /// The account is left untouched, and `false` returned, if any of the
-    /// resulting amounts would overflow. Balances are therefore never left
-    /// half-updated, and no arithmetic on them can panic later.
+    /// resulting amounts would overflow, so a balance is never left
+    /// half-updated and no later arithmetic on one can panic.
     fn shift(&mut self, available: Amount, held: Amount) -> bool {
         let (Some(available), Some(held)) = (
             self.available.checked_add(available),

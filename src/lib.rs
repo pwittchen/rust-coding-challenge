@@ -20,10 +20,6 @@
 //!   they can move, through checked operations the engine has to go through.
 //! - [`output`] renders the resulting accounts as the report.
 //!
-//! The split is deliberate: the rules of the business live in one module, the
-//! arithmetic that protects the balances in another, and the CSV format at the
-//! two ends. Each can be read, tested and changed without the others.
-//!
 //! # Example
 //!
 //! The three steps the diagram above describes, end to end. Reading is generic
