@@ -195,8 +195,17 @@ document cargo lint alias in the README.md
 
 ## 2026-08-29 15:55:30
 
+/score
 apply prioritized fixes from the report
 
 ## 2026-08-29 16:04:03
+
+/commit
+
+## 2026-08-29 16:07:18
+
+in the CLAUDE.md add cargo lint execution after performing each task in addition to cargo build and test
+
+## 2026-08-29 16:08:29
 
 /commit

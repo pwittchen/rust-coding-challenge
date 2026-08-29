@@ -102,8 +102,8 @@ belongs there.
 Also in the repo: `README.md` (user-facing documentation), `transactions.csv`
 (sample input), `clippy.toml` (the test-only exemptions from the safety lints),
 and `.github/workflows/rust.yml` (CI: `cargo fmt --check`, `cargo build`,
-`cargo clippy` and `cargo test` on push and PR to `master`). `accounts.csv` is
-generated output and is gitignored.
+`cargo build --release`, `cargo clippy` and `cargo test` on push and PR to
+`master`). `accounts.csv` is generated output and is gitignored.
 
 The `/score` skill in `.claude/skills/score/` grades the project against the
 scoring criteria in `SPEC.md`: it builds, runs and probes the binary, reads the
@@ -165,12 +165,20 @@ After implementing a change, always run:
 cargo fmt      # the code must be properly formatted
 cargo build    # the program must build
 cargo test     # the tests must pass
+cargo lint     # the pedantic pass must report nothing
 ```
 
-Run all three before reporting the change as done, and fix anything they
+Run all four before reporting the change as done, and fix anything they
 surface. A change is not finished while any of them fails.
-`cargo clippy --all-targets -- -D warnings` must stay clean too — it is what
-enforces the safety lints, and CI runs it alongside `cargo fmt --check`.
+
+`cargo lint` is the alias from `.cargo/config.toml`
+(`clippy -- -W clippy::all -W clippy::pedantic`). Its warnings are advisory
+rather than build-breaking, but the crate is currently clean of them and should
+stay that way, so treat a new one as something to fix rather than to leave.
+Because it does not pass `--all-targets`, it does not see the test code; run
+`cargo clippy --all-targets -- -D warnings` as well after touching tests. That
+command is the one that enforces the safety lints and the one CI runs, alongside
+`cargo fmt --check` and a release build.
 
 ## Commands
 
@@ -179,7 +187,8 @@ cargo run -- transactions.csv > accounts.csv   # required CLI contract
 cargo build
 cargo test
 cargo fmt
-cargo clippy --all-targets -- -D warnings
+cargo lint                                     # pedantic pass, advisory
+cargo clippy --all-targets -- -D warnings      # the safety lints, as CI runs them
 ```
 
 Toolchain: Rust edition 2024, which requires rustc 1.85 or newer; developed and
