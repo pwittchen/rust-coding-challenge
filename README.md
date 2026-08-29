@@ -44,6 +44,11 @@ cargo build --release   # optimized build
 cargo clean             # remove target/, the build artifacts of both profiles
 ```
 
+The debug profile is built with the optimizer on ([`Cargo.toml`](Cargo.toml)),
+because the engine is normally run through `cargo run`, and an unoptimized build
+takes about eight times as long on the same input. The debug assertions and the
+arithmetic overflow checks stay on, so the profile still does what it is for.
+
 ## Running
 
 The input file is the first and only argument; the report goes to standard

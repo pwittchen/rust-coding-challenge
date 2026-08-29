@@ -28,3 +28,17 @@ indexing_slicing = "deny"
 # Balances are fixed-point decimals. A float would silently lose cents, so the
 # type is not merely avoided by convention — arithmetic on one will not compile.
 float_arithmetic = "deny"
+
+# The engine is normally run through `cargo run`, which builds without
+# optimizations, and an unoptimized build spends roughly eight times as long on
+# the same input. Turning the optimizer on for the debug profile brings it
+# within a third of a release build while keeping the debug assertions and the
+# arithmetic overflow checks, which are what the profile is for.
+[profile.dev]
+opt-level = 1
+
+# The dependencies do the parsing and the decimal arithmetic, so they are worth
+# optimizing fully. They are compiled once and then cached, so this costs
+# nothing on a rebuild of the crate itself.
+[profile.dev.package."*"]
+opt-level = 3
