@@ -5,21 +5,13 @@
 //!
 //! # Interpretation of the specification
 //!
-//! The specification leaves a few cases open. They are resolved the way a bank
-//! would resolve them, and the reasoning is documented on the method that
-//! implements each decision:
-//!
-//! - only deposits can be disputed (see [`Engine::dispute`]);
-//! - a dispute, resolve or chargeback must come from the client that owns the
-//!   referenced transaction;
-//! - a frozen account accepts no further transactions of any kind;
-//! - a deposit reusing the ID of an earlier one is ignored (see
-//!   [`Engine::deposit`]);
-//! - a deposit or a withdrawal opens the account of the client it names, even
-//!   when the transaction itself cannot be applied (see [`Engine::withdraw`]);
-//! - a dispute may drive the available funds negative (see [`Engine::dispute`]);
-//! - an amount carrying more than four decimal places is cut to four (see
-//!   [`usable_amount`]).
+//! The specification leaves a few cases open: whether a withdrawal can be
+//! disputed, who may raise one, what a frozen account still accepts, what a
+//! repeated transaction ID means. Each is resolved the way a bank would resolve
+//! it, and the reasoning sits on the method that implements it rather than in a
+//! list here — one place to read it, and one place to change it, found by
+//! whoever is reading the code it governs. The README's "Assumptions" section
+//! gathers them for a reader who wants them together.
 //!
 //! Anything the engine cannot apply — an unknown transaction ID, a resolve for
 //! a transaction that is not under dispute, a withdrawal that is not covered —
@@ -227,6 +219,12 @@ impl Engine {
 /// negative deposit is a withdrawal in disguise, and would bypass the check that
 /// available funds cover it.
 ///
+/// An amount of zero is neither, and is applied. It moves no money, but a
+/// deposit of zero is still a deposit: it takes its transaction ID, and a
+/// dispute may later refer back to it and hold nothing. The comparison is
+/// against zero rather than a test of the sign, so that a zero the input spells
+/// `-0.0` is treated as the zero it is and not as a negative amount.
+///
 /// Anything past the fourth decimal place is dropped rather than rounded. The
 /// input is specified to carry no more than four, so this only bites on a
 /// malformed row, and cutting the excess keeps every balance exactly as precise
@@ -236,7 +234,7 @@ impl Engine {
 /// fraction they did not send.
 fn usable_amount(amount: Option<Amount>) -> Option<Amount> {
     amount
-        .filter(Amount::is_sign_positive)
+        .filter(|amount| *amount >= Amount::ZERO)
         .map(|amount| amount.trunc_with_scale(SCALE))
 }
 
@@ -451,6 +449,20 @@ mod tests {
         );
 
         // The second deposit is ignored, which shows the first one took the ID.
+        assert_balances(&engine, 1, "0", "0");
+    }
+
+    #[test]
+    fn treats_a_negative_zero_as_the_zero_it_is() {
+        // A zero is not a negative amount however the input spells it, so this
+        // deposit is applied and takes its ID exactly like a plain `0.0`.
+        let engine = engine(
+            "type,client,tx,amount\n\
+             deposit,1,1,-0.0\n\
+             deposit,1,1,5.0\n\
+             dispute,1,1,\n",
+        );
+
         assert_balances(&engine, 1, "0", "0");
     }
 

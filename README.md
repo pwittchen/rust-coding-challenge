@@ -167,11 +167,10 @@ negative; and further transactions arriving on a frozen account. The boundaries
 are covered too: the largest client and transaction IDs, four-decimal precision,
 amounts finer than that, an amount with more significant digits than a float
 could hold — which is read and kept exactly — a type in any capitalization,
-balances that would overflow, and
-the largest balance an account can hold, both rendered directly and reached
-through a chargeback that drives it negative, since a balance the engine accepts
-but the report cannot print would be a failure on the last line of an otherwise
-successful run.
+balances that would overflow, and the largest balance an account can hold, both
+rendered directly and reached through a chargeback that drives it negative,
+since a balance the engine accepts but the report cannot print would be a
+failure on the last line of an otherwise successful run.
 
 Those cases each pin down one rule. One further test asserts what has to hold
 whichever rules a stream happens to trigger: it generates four thousand
@@ -250,10 +249,11 @@ errors on the partner's side, and one bad row is no reason to discard the rest
 of the file.
 
 **A record that cannot be parsed aborts the run.** An unknown transaction type,
-a client ID that does not fit a `u16`, an amount that is not a decimal: the
-input is not what it claims to be, so nothing after that point can be trusted
-either. The run stops with a message on stderr naming the file, the line, and
-what was wrong with it, and exits non-zero.
+a client ID that does not fit a `u16`, an amount that is not a decimal or that
+has more digits than one can hold: the input is not what it claims to be, so
+nothing after that point can be trusted either. The run stops with a message on
+stderr naming the file, the line, and what was wrong with it, and exits
+non-zero.
 
 Because that rule is strict, what falls under it matters, and the line is drawn
 at rows whose meaning cannot be recovered rather than at rows that are merely
@@ -420,7 +420,10 @@ each decision, in `src/engine.rs`:
   leaving the client owing the difference.
 - **A deposit or withdrawal without an amount, or with a negative one, is
   ignored.** A negative deposit is a withdrawal in disguise, and would bypass
-  the check that the available funds cover it.
+  the check that the available funds cover it. An amount of zero is neither, and
+  is applied: it moves no money, but a deposit of zero still takes its
+  transaction ID, and a dispute may later refer back to it and hold nothing. A
+  zero the input spells `-0.0` is the same zero and is treated the same way.
 - **The `type` column is read without regard to its capitalization.** The
   specification spells the five types in lower case, and any other word ends the
   run — so where that line falls decides what counts as unintelligible input.

@@ -124,6 +124,15 @@ pub struct Transaction {
 ///
 /// An empty field, or a row that stops before this column, is not an amount but
 /// the absence of one: disputes, resolves and chargebacks carry no amount.
+///
+/// An amount with more digits than a decimal can hold is rejected here, and ends
+/// the run — unlike a balance that grows beyond what a decimal can hold, which
+/// [`Account`](crate::account::Account) refuses while the run continues. The two
+/// are the same size but not the same kind of problem: a figure this reader
+/// cannot represent is a row it cannot understand, and the rule for those is that
+/// the input is not what it claims to be, whereas a balance that cannot take
+/// another deposit is an account that is full, which is an outcome rather than a
+/// misunderstanding.
 fn deserialize_amount<'de, D: Deserializer<'de>>(
     deserializer: D,
 ) -> Result<Option<Amount>, D::Error> {

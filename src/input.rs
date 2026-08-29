@@ -177,6 +177,9 @@ mod tests {
             "deposit, 1, , 1.0",    // no transaction ID
             "deposit, 1, 1, abc",   // amount that is not a decimal
             "deposit, , 1, 1.0",    // no client ID
+            // More digits than a decimal can represent: a figure the reader
+            // cannot hold is a row it cannot understand.
+            "deposit, 1, 1, 99999999999999999999999999999999",
         ] {
             let input = format!("type, client, tx, amount\n{row}\n");
             let mut records = read_transactions(input.as_bytes());
