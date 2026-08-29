@@ -59,7 +59,7 @@ Design points worth preserving when changing the code:
 
 ## Tests
 
-Unit tests live in `mod tests` next to the code they cover (34 at present).
+Unit tests live in `mod tests` next to the code they cover (58 at present).
 Engine and output tests drive the code through the same CSV parsing the binary
 uses, so they exercise the whole path from input row to account state. New
 behaviour needs a test in the module that owns it.

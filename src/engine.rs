@@ -13,7 +13,10 @@
 //! - a dispute, resolve or chargeback must come from the client that owns the
 //!   referenced transaction;
 //! - a frozen account accepts no further transactions of any kind;
-//! - a transaction ID is used at most once (see [`Engine::deposit`]);
+//! - a deposit reusing the ID of an earlier one is ignored (see
+//!   [`Engine::deposit`]);
+//! - a deposit or a withdrawal opens the account of the client it names, even
+//!   when the transaction itself cannot be applied (see [`Engine::withdraw`]);
 //! - a dispute may drive the available funds negative (see [`Engine::dispute`]).
 //!
 //! Anything the engine cannot apply — an unknown transaction ID, a resolve for
@@ -187,16 +190,15 @@ impl Engine {
     /// globally unique, so a repeated one is an error on our partner's side, and
     /// honouring it would make a later dispute ambiguous.
     fn deposit(&mut self, client: ClientId, tx: TxId, amount: Option<Amount>) {
+        // Looked up before the account is borrowed, since both live on `self`.
+        let repeated = self.transactions.contains_key(&tx);
+        let account = self.account(client);
+
         let Some(amount) = usable_amount(amount) else {
             return;
         };
 
-        if self.transactions.contains_key(&tx) {
-            return;
-        }
-
-        let account = self.account(client);
-        if account.is_locked() || !account.deposit(amount) {
+        if repeated || account.is_locked() || !account.deposit(amount) {
             return;
         }
 
@@ -208,12 +210,22 @@ impl Engine {
     /// withdrawal.
     ///
     /// Withdrawals are not recorded, because only deposits can be disputed.
+    /// Their ID is therefore free for a later deposit to take, which is harmless
+    /// because nothing can refer back to a withdrawal.
+    ///
+    /// Like a deposit, a withdrawal names the client it is for, so it opens
+    /// their account even when it cannot be applied: the client exists as far as
+    /// the input is concerned, and an attempt to move money they do not have
+    /// leaves them with an empty account rather than with none at all. Disputes,
+    /// resolves and chargebacks never open an account, because they only ever
+    /// refer back to a transaction whose client already has one.
     fn withdraw(&mut self, client: ClientId, amount: Option<Amount>) {
+        let account = self.account(client);
+
         let Some(amount) = usable_amount(amount) else {
             return;
         };
 
-        let account = self.account(client);
         if account.is_locked() {
             return;
         }
@@ -372,6 +384,34 @@ mod tests {
     }
 
     #[test]
+    fn opens_an_account_for_a_client_whose_transactions_all_fail() {
+        let engine = engine(
+            "type,client,tx,amount\n\
+             withdrawal,3,1,5.0\n\
+             deposit,4,2,-1.0\n\
+             withdrawal,5,3,\n",
+        );
+
+        assert_eq!(engine.accounts().len(), 3);
+        for client in [3, 4, 5] {
+            assert_balances(&engine, client, "0", "0");
+            assert!(!account(&engine, client).is_locked());
+        }
+    }
+
+    #[test]
+    fn opens_no_account_for_a_dispute_referring_to_an_unknown_transaction() {
+        let engine = engine(
+            "type,client,tx,amount\n\
+             dispute,6,1,\n\
+             resolve,6,1,\n\
+             chargeback,6,1,\n",
+        );
+
+        assert_eq!(engine.accounts().len(), 0);
+    }
+
+    #[test]
     fn keeps_the_full_precision_of_four_decimal_places() {
         let engine = engine(
             "type,client,tx,amount\n\
@@ -392,6 +432,42 @@ mod tests {
         );
 
         assert_balances(&engine, 1, "1.0", "0");
+    }
+
+    #[test]
+    fn allows_a_withdrawal_of_the_entire_available_balance() {
+        let engine = engine(
+            "type,client,tx,amount\n\
+             deposit,1,1,1.2345\n\
+             withdrawal,1,2,1.2345\n",
+        );
+
+        assert_balances(&engine, 1, "0", "0");
+    }
+
+    #[test]
+    fn ignores_a_withdrawal_covered_only_by_held_funds() {
+        let engine = engine(
+            "type,client,tx,amount\n\
+             deposit,1,1,5.0\n\
+             dispute,1,1,\n\
+             withdrawal,1,2,1.0\n",
+        );
+
+        assert_balances(&engine, 1, "0", "5.0");
+    }
+
+    #[test]
+    fn ignores_a_withdrawal_from_an_account_whose_available_funds_are_negative() {
+        let engine = engine(
+            "type,client,tx,amount\n\
+             deposit,1,1,1.0\n\
+             withdrawal,1,2,1.0\n\
+             dispute,1,1,\n\
+             withdrawal,1,3,0.0001\n",
+        );
+
+        assert_balances(&engine, 1, "-1.0", "1.0");
     }
 
     #[test]
@@ -419,6 +495,18 @@ mod tests {
     }
 
     #[test]
+    fn records_a_deposit_of_zero_without_changing_the_balance() {
+        let engine = engine(
+            "type,client,tx,amount\n\
+             deposit,1,1,0.0\n\
+             deposit,1,1,5.0\n",
+        );
+
+        // The second deposit is ignored, which shows the first one took the ID.
+        assert_balances(&engine, 1, "0", "0");
+    }
+
+    #[test]
     fn holds_the_funds_of_a_disputed_deposit() {
         let engine = engine(
             "type,client,tx,amount\n\
@@ -429,6 +517,42 @@ mod tests {
 
         assert_balances(&engine, 1, "2.0", "1.0");
         assert!(!account(&engine, 1).is_locked());
+    }
+
+    #[test]
+    fn holds_the_funds_of_several_disputed_deposits_at_once() {
+        let engine = engine(
+            "type,client,tx,amount\n\
+             deposit,1,1,1.0\n\
+             deposit,1,2,2.0\n\
+             deposit,1,3,4.0\n\
+             dispute,1,1,\n\
+             dispute,1,3,\n",
+        );
+
+        assert_balances(&engine, 1, "2.0", "5.0");
+    }
+
+    #[test]
+    fn keeps_the_total_unchanged_through_a_dispute_and_its_resolution() {
+        let deposits = "type,client,tx,amount\n\
+                        deposit,1,1,3.0\n\
+                        deposit,1,2,4.0\n";
+        let total = account(&engine(deposits), 1).total();
+
+        let disputed = engine(&format!("{deposits}dispute,1,1,\n"));
+        assert_eq!(
+            account(&disputed, 1).total(),
+            total,
+            "a dispute holds funds"
+        );
+
+        let resolved = engine(&format!("{deposits}dispute,1,1,\nresolve,1,1,\n"));
+        assert_eq!(
+            account(&resolved, 1).total(),
+            total,
+            "a resolve releases them"
+        );
     }
 
     #[test]
@@ -471,6 +595,53 @@ mod tests {
     }
 
     #[test]
+    fn lets_a_chargeback_drive_the_total_negative() {
+        let engine = engine(
+            "type,client,tx,amount\n\
+             deposit,1,1,5.0\n\
+             withdrawal,1,2,5.0\n\
+             dispute,1,1,\n\
+             chargeback,1,1,\n",
+        );
+
+        assert_balances(&engine, 1, "-5.0", "0");
+        assert!(account(&engine, 1).is_locked());
+    }
+
+    #[test]
+    fn keeps_the_funds_of_the_other_disputes_held_when_the_account_is_frozen() {
+        let engine = engine(
+            "type,client,tx,amount\n\
+             deposit,1,1,1.0\n\
+             deposit,1,2,2.0\n\
+             dispute,1,1,\n\
+             dispute,1,2,\n\
+             chargeback,1,1,\n\
+             resolve,1,2,\n",
+        );
+
+        assert_balances(&engine, 1, "0", "2.0");
+        assert!(account(&engine, 1).is_locked());
+    }
+
+    #[test]
+    fn freezes_only_the_account_of_the_client_that_charged_back() {
+        let engine = engine(
+            "type,client,tx,amount\n\
+             deposit,1,1,1.0\n\
+             deposit,2,2,1.0\n\
+             dispute,1,1,\n\
+             chargeback,1,1,\n\
+             deposit,2,3,1.0\n",
+        );
+
+        assert_balances(&engine, 1, "0", "0");
+        assert!(account(&engine, 1).is_locked());
+        assert_balances(&engine, 2, "2.0", "0");
+        assert!(!account(&engine, 2).is_locked());
+    }
+
+    #[test]
     fn ignores_transactions_on_a_frozen_account() {
         let engine = engine(
             "type,client,tx,amount\n\
@@ -504,6 +675,19 @@ mod tests {
             "type,client,tx,amount\n\
              deposit,1,1,2.0\n\
              withdrawal,1,2,1.0\n\
+             dispute,1,2,\n",
+        );
+
+        assert_balances(&engine, 1, "1.0", "0");
+    }
+
+    #[test]
+    fn ignores_a_dispute_over_a_deposit_that_was_never_applied() {
+        let engine = engine(
+            "type,client,tx,amount\n\
+             deposit,1,1,1.0\n\
+             deposit,1,1,5.0\n\
+             deposit,1,2,-3.0\n\
              dispute,1,2,\n",
         );
 
@@ -561,6 +745,62 @@ mod tests {
     }
 
     #[test]
+    fn ignores_a_resolve_raised_by_another_client() {
+        let engine = engine(
+            "type,client,tx,amount\n\
+             deposit,1,1,1.0\n\
+             deposit,2,2,1.0\n\
+             dispute,1,1,\n\
+             resolve,2,1,\n",
+        );
+
+        assert_balances(&engine, 1, "0", "1.0");
+        assert_balances(&engine, 2, "1.0", "0");
+    }
+
+    #[test]
+    fn ignores_a_resolve_repeated_after_the_dispute_was_settled() {
+        let engine = engine(
+            "type,client,tx,amount\n\
+             deposit,1,1,1.0\n\
+             dispute,1,1,\n\
+             resolve,1,1,\n\
+             resolve,1,1,\n",
+        );
+
+        assert_balances(&engine, 1, "1.0", "0");
+    }
+
+    #[test]
+    fn ignores_a_chargeback_raised_by_another_client() {
+        let engine = engine(
+            "type,client,tx,amount\n\
+             deposit,1,1,1.0\n\
+             deposit,2,2,1.0\n\
+             dispute,1,1,\n\
+             chargeback,2,1,\n",
+        );
+
+        assert_balances(&engine, 1, "0", "1.0");
+        assert_balances(&engine, 2, "1.0", "0");
+        assert!(engine.accounts().all(|account| !account.is_locked()));
+    }
+
+    #[test]
+    fn ignores_a_chargeback_after_the_dispute_was_resolved() {
+        let engine = engine(
+            "type,client,tx,amount\n\
+             deposit,1,1,1.0\n\
+             dispute,1,1,\n\
+             resolve,1,1,\n\
+             chargeback,1,1,\n",
+        );
+
+        assert_balances(&engine, 1, "1.0", "0");
+        assert!(!account(&engine, 1).is_locked());
+    }
+
+    #[test]
     fn allows_a_resolved_transaction_to_be_disputed_again() {
         let engine = engine(
             "type,client,tx,amount\n\
@@ -590,6 +830,17 @@ mod tests {
     }
 
     #[test]
+    fn accepts_the_largest_client_and_transaction_ids() {
+        let engine = engine(
+            "type,client,tx,amount\n\
+             deposit,65535,4294967295,1.0\n\
+             dispute,65535,4294967295,\n",
+        );
+
+        assert_balances(&engine, ClientId::MAX, "0", "1.0");
+    }
+
+    #[test]
     fn leaves_the_account_untouched_when_a_deposit_would_overflow() {
         let mut account = Account::new(1);
         assert!(account.deposit(Decimal::MAX));
@@ -608,5 +859,16 @@ mod tests {
         assert_eq!(account.available(), Decimal::ZERO);
         assert_eq!(account.held(), Decimal::MAX);
         assert_eq!(account.total(), Decimal::MAX);
+    }
+
+    #[test]
+    fn leaves_the_account_untouched_when_a_dispute_would_overflow() {
+        let mut account = Account::new(1);
+        assert!(account.deposit(Decimal::MAX));
+        assert!(account.hold(Decimal::MAX));
+
+        assert!(!account.hold(Decimal::MAX));
+        assert_eq!(account.available(), Decimal::ZERO);
+        assert_eq!(account.held(), Decimal::MAX);
     }
 }

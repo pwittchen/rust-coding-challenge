@@ -98,3 +98,7 @@ in the CLAUDE.md add note that SPEC.md is ignored by the git, available only loc
 ## 2026-08-29 14:13:11
 
 /commit
+
+## 2026-08-29 14:15:45
+
+Please have a deep look at the all cases regarding transactions described in the SPEC.md and ensure all of them are covered. If you can figure out any other cases, which should be covered, also cover them, but first be sure that criteria in the SPEC.md are met. Ensure that every corner case regarding transaction logic, happy paths and negative paths are covered by tests. If any test is missing, then add it. Your goal is to make logic robust.

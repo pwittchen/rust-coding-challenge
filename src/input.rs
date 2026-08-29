@@ -92,11 +92,47 @@ mod tests {
     }
 
     #[test]
-    fn reports_a_malformed_record_as_an_error_item() {
-        let mut records =
-            read_transactions("type, client, tx, amount\nteleport, 1, 1, 1.0\n".as_bytes());
+    fn reads_the_columns_in_whatever_order_the_header_gives_them() {
+        let transactions = read_all("client, type, amount, tx\n1, deposit, 1.5, 7\n");
 
-        assert!(records.next().expect("a record is present").is_err());
+        assert_eq!(
+            transactions,
+            vec![Transaction {
+                kind: TransactionType::Deposit,
+                client: 1,
+                tx: 7,
+                amount: Some(Decimal::new(15, 1)),
+            }]
+        );
+    }
+
+    #[test]
+    fn reads_no_records_from_an_input_without_rows() {
+        assert!(read_all("").is_empty());
+        assert!(read_all("type, client, tx, amount\n").is_empty());
+    }
+
+    #[test]
+    fn reports_a_malformed_record_as_an_error_item() {
+        // A row the engine cannot make sense of is not skipped: the input itself
+        // cannot be trusted, so the run is aborted instead.
+        for row in [
+            "teleport, 1, 1, 1.0",  // unknown transaction type
+            "Deposit, 1, 1, 1.0",   // the type is not spelled in lower case
+            "deposit, 65536, 1, 1", // client ID beyond u16
+            "deposit, 1, -1, 1.0",  // transaction ID beyond u32
+            "deposit, 1, , 1.0",    // no transaction ID
+            "deposit, 1, 1, abc",   // amount that is not a decimal
+            "deposit, , 1, 1.0",    // no client ID
+        ] {
+            let input = format!("type, client, tx, amount\n{row}\n");
+            let mut records = read_transactions(input.as_bytes());
+
+            assert!(
+                records.next().expect("a record is present").is_err(),
+                "{row} should not be readable"
+            );
+        }
     }
 
     #[test]

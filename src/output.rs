@@ -134,6 +134,34 @@ mod tests {
     }
 
     #[test]
+    fn reports_negative_balances() {
+        let report = report(
+            "type,client,tx,amount\n\
+             deposit,1,1,1.5\n\
+             withdrawal,1,2,1.5\n\
+             dispute,1,1,\n\
+             chargeback,1,1,\n",
+        );
+
+        assert_eq!(
+            report,
+            "client,available,held,total,locked\n\
+             1,-1.5000,0.0000,-1.5000,true\n"
+        );
+    }
+
+    #[test]
+    fn reports_an_account_whose_transactions_were_all_rejected() {
+        let report = report("type,client,tx,amount\nwithdrawal,9,1,1.0\n");
+
+        assert_eq!(
+            report,
+            "client,available,held,total,locked\n\
+             9,0.0000,0.0000,0.0000,false\n"
+        );
+    }
+
+    #[test]
     fn reports_amounts_with_a_precision_of_four_decimal_places() {
         let report = report(
             "type,client,tx,amount\n\

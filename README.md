@@ -90,12 +90,23 @@ cargo clippy -- -D warnings
 cargo test
 ```
 
-The unit tests live next to the code they cover: parsing and reading the input
-in `src/transaction.rs` and `src/input.rs`, every transaction type and its edge
-cases in `src/engine.rs`, and the shape and precision of the report in
-`src/output.rs`. The engine tests drive the engine through the same CSV parsing
-the binary uses, so they exercise the whole path from input row to account
-state.
+The unit tests live next to the code they cover: argument handling in
+`src/main.rs`, parsing and reading the input in `src/transaction.rs` and
+`src/input.rs`, every transaction type and its edge cases in `src/engine.rs`,
+and the shape and precision of the report in `src/output.rs`. The engine tests
+drive the engine through the same CSV parsing the binary uses, so they exercise
+the whole path from input row to account state.
+
+Every transaction type is covered on both its happy path and its negative ones:
+a withdrawal that is not covered, that is covered only by held funds, or that
+would leave an already negative balance; a dispute over an unknown transaction,
+over a withdrawal, over a deposit that was itself rejected, over one that is
+already disputed, or raised by another client; a resolve or a chargeback for a
+transaction that is not under dispute, that was already settled, or that belongs
+to somebody else; a chargeback that freezes the account and leaves the total
+negative; and further transactions arriving on a frozen account. The boundaries
+are covered too: the largest client and transaction IDs, four-decimal precision,
+and balances that would overflow.
 
 ## Project layout
 
@@ -121,9 +132,16 @@ each decision, in `src/engine.rs`:
   referenced transaction.** Otherwise one client could freeze another's account.
 - **A frozen account accepts no further transactions of any kind.** A chargeback
   is the end of the account's activity until a human intervenes.
-- **A transaction ID is used at most once.** IDs are globally unique, so a
-  repeated one is an error on the partner's side, and honouring it would make a
-  later dispute ambiguous.
+- **A deposit reusing the ID of an earlier one is ignored.** IDs are globally
+  unique, so a repeated one is an error on the partner's side, and honouring it
+  would make a later dispute ambiguous. Withdrawals are not recorded at all, so
+  nothing can refer back to one and their IDs are not tracked.
+- **A deposit or a withdrawal opens the account of the client it names**, even
+  when the transaction itself is rejected: the client exists as far as the input
+  is concerned, and an attempt to move money they do not have leaves them with
+  an empty account rather than with none at all. Disputes, resolves and
+  chargebacks never open an account, because they only refer back to a
+  transaction whose client already has one.
 - **A dispute may drive the available funds negative**, when the deposit under
   dispute has already been withdrawn. The total must not change, so the held
   amount has to come out of the available funds whether they cover it or not,
