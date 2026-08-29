@@ -9,6 +9,11 @@ Assess the project the way a reviewer would: build it, run it, read it, and
 grade it against each scoring category. This is a **read-only assessment** —
 report findings, do not fix them unless the user asks afterwards.
 
+The question this answers is "is it good enough to submit?", not "what else
+could be changed?". A mature project reaches a point where the remaining
+observations are matters of taste, and the right answer is to stop. Report what
+would genuinely cost points; note anything else in passing and leave it alone.
+
 ## 1. Read the criteria
 
 The categories and what each one rewards are defined in the **Scoring** section
@@ -58,8 +63,9 @@ the repo):
 - a missing input file, and no argument at all
 
 For each, note whether the program's behaviour matches the spec, matches a
-documented assumption in the README, or matches neither. The third case is a
-finding.
+documented assumption in the README, or matches neither. Only the third case is
+a finding, and it is a critical or important one — behaviour the README already
+explains is a decision, not a defect, however you would have decided it.
 
 For efficiency, generate a large input in the scratchpad — several million rows
 spread over the full `u32` transaction ID and `u16` client ID ranges — and
@@ -100,26 +106,77 @@ For each category give:
 - **A grade**: Strong / Adequate / Weak.
 - **Evidence**: the command output, file and line, or measurement behind it.
   `src/engine.rs:120` beats "the engine looks fine".
-- **Gaps**: what a reviewer could reasonably mark down, however small.
+- **Findings**, if there are any, each classified by severity below.
 
-Be a critic, not a cheerleader. A category with nothing to improve is rare; if
-you claim one, the evidence has to carry it. Equally, do not invent faults —
-a documented, defensible choice is not a defect, and neither is a deliberate
-deviation the README explains.
+### Severity
+
+The point of the grade is to decide whether the project is finished, so every
+finding has to be sorted into one of three buckets. Be strict about what earns
+the top two.
+
+- **Critical** — it costs points, or breaks something a reviewer will run.
+  Wrong output for a valid input; a violated CLI contract; a panic, a failed
+  build, a failing test, a clippy denial; a transaction case not handled at all;
+  memory that grows with the size of the input rather than with the state that
+  has to be kept. Must be fixed.
+- **Important** — a real gap a competent reviewer would probably mark down.
+  A documented claim that is not true of the code; a corner case the spec names
+  that nothing exercises; a complicated path with no test; behaviour that would
+  plausibly fail an automated grader's sample. Worth fixing.
+- **Minor** — everything else. Wording, prose length, naming, formatting of
+  documentation, a micro-optimization, a different-but-equivalent design, a
+  ratio of tests to code, a preference about how something is phrased or
+  organized. **Mention these in one line and move on.** They are not defects,
+  they do not lower a grade, and they do not go in the fix list.
+
+When unsure between Important and Minor, it is Minor. A finding is only
+Important if you can name the concrete consequence — what a reviewer would
+observe, or what input would misbehave. "A reviewer might prefer…" is Minor by
+definition.
+
+### Judgement
+
+Do not invent faults. A documented, defensible choice is not a defect, and
+neither is a deliberate deviation the README explains. A category with no
+critical or important findings is graded Strong with nothing listed against it —
+that is a normal outcome for finished work, not a failure to look hard enough,
+and padding it with minor observations to look thorough is exactly the thing
+this section exists to prevent.
+
+Equally, do not soften a real one: a critical finding stays critical however
+polished the surrounding code is.
+
+### When the project is done
+
+If a pass turns up no critical and no important findings, say so plainly in the
+verdict — the project meets the criteria, the corner cases are covered, and **no
+further code changes are warranted**. Recommend stopping. Do not assemble a fix
+list out of minor observations to give the next session something to do; the
+correct output at that point is a grade, the evidence for it, and a
+recommendation to leave the code alone.
 
 ## 5. Report
 
 Output to the terminal, in this shape:
 
-1. A one-line overall verdict.
+1. A one-line overall verdict. When there is nothing critical or important, say
+   so here — that the project meets the criteria and needs no further changes.
 2. A table: Category | Grade | One-line rationale.
-3. A short section per category with the evidence and gaps.
-4. A prioritized list of concrete fixes, highest value first, each naming the
-   file it touches and what it would change.
+3. A short section per category with the evidence, and any critical or important
+   findings against it.
+4. **Fixes worth making** — the critical and important findings only, highest
+   value first, each naming the file it touches and what it would change. Omit
+   this section entirely when there are none; do not write "none" and then list
+   things anyway.
+5. **Minor observations** — at most a handful of one-line notes, under a heading
+   that says plainly they are not worth acting on. Skip the section if nothing
+   comes to mind. Never expand one into a paragraph of justification.
 
 Keep it terminal text unless the user asks for a document. Do not create a
 report file in the repo, do not commit anything, and do not mention the hiring
 company, its products or its domains anywhere in the output.
 
-If the user then asks for the fixes, work through the prioritized list, and run
-`cargo fmt`, `cargo build` and `cargo test` before reporting any of it as done.
+If the user then asks for the fixes, work through the fixes-worth-making list
+only — a request to "apply the fixes" does not extend to the minor observations
+unless the user names one. Run `cargo fmt`, `cargo build`, `cargo test` and
+`cargo lint` before reporting any of it as done.

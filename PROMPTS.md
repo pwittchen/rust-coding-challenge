@@ -209,3 +209,11 @@ in the CLAUDE.md add cargo lint execution after performing each task in addition
 ## 2026-08-29 16:08:29
 
 /commit
+
+## 2026-08-29 16:10:39
+
+update /score CC skill so it find only the critical and important issues and just mention minor issues but doesn't treat them as something significant. Goal is to not update code endlessly, but stop once quality is good enough, all corner cases are covered and all important critearia are met
+
+## 2026-08-29 16:12:21
+
+/commit

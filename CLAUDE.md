@@ -108,7 +108,12 @@ and `.github/workflows/rust.yml` (CI: `cargo fmt --check`, `cargo build`,
 The `/score` skill in `.claude/skills/score/` grades the project against the
 scoring criteria in `SPEC.md`: it builds, runs and probes the binary, reads the
 sources, and reports a grade with evidence per category. It assesses only —
-fixes are a separate, explicit request.
+fixes are a separate, explicit request. It reports only what would genuinely
+cost points, classified critical or important; anything smaller is noted in
+passing and left alone. When a pass finds nothing in those two classes it says
+the project is done and recommends no further changes, which is the expected
+outcome once the criteria are met — the skill is there to decide whether the
+work is finished, not to keep generating work.
 
 ## Prompt log
 
