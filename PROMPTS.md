@@ -46,3 +46,11 @@ extract contents of the transactions.csv from the SPEC.md into the transactions.
 ## 2026-08-29 12:39:17
 
 /commit
+
+## 2026-08-29 12:42:10
+
+According to the SPEC.md, define all necessary data structures which are needed to resolve and implement this solution. I mean transaction, transactions, and transaction types. Also initialize empty transaction list.
+
+## 2026-08-29 12:45:07
+
+/commit

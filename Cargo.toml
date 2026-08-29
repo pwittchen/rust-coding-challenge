@@ -5,4 +5,5 @@ edition = "2024"
 
 [dependencies]
 csv = "1.4.0"
+rust_decimal = { version = "1.42.1", default-features = false, features = ["serde", "std"] }
 serde = { version = "1.0.229", features = ["derive"] }
