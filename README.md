@@ -361,7 +361,11 @@ each decision, in `src/engine.rs`:
 - **A dispute, resolve, or chargeback must come from the client that owns the
   referenced transaction.** Otherwise, one client could freeze another's account.
 - **A frozen account accepts no further transactions of any kind.** A chargeback
-  is the end of the account's activity until a human intervenes.
+  is the end of the account's activity until a human intervenes. Funds held for
+  a dispute that was still open at that moment therefore stay held: no later
+  resolve can release them. That is the point of a freeze — money in the middle
+  of a claim is exactly what should not move on its own while the account is
+  waiting to be looked at.
 - **A deposit reusing the ID of an earlier one is ignored.** IDs are globally
   unique, so a repeated one is an error on the partner's side, and honouring it
   would make a later dispute ambiguous. Withdrawals are not recorded at all, so

@@ -186,6 +186,12 @@ impl Engine {
     /// It cannot when the transaction is unknown, when it belongs to another
     /// client — a client may only dispute their own transactions — or when the
     /// account is frozen.
+    ///
+    /// Freezing therefore strands the funds of any dispute that was still open
+    /// when the chargeback landed: nothing can resolve them afterwards, and they
+    /// stay held. That is the intended reading of a freeze — the account stops
+    /// settling anything until a human looks at it, and money in the middle of a
+    /// claim is exactly what should not move on its own in the meantime.
     fn disputable(
         &mut self,
         client: ClientId,
