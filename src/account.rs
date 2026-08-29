@@ -54,9 +54,12 @@ impl Account {
 
     /// Funds that are either available or held.
     pub fn total(&self) -> Amount {
-        // Cannot overflow: every mutation rejects a change whose resulting
-        // total is not representable.
-        self.available + self.held
+        // The saturation is unreachable: every mutation rejects a change whose
+        // resulting total is not representable, so the sum always fits. It is
+        // written as a checked operation regardless, so that the guarantee is
+        // the compiler's rather than this comment's — a plain `+` on a decimal
+        // panics on overflow, which is the one thing this crate must never do.
+        self.available.saturating_add(self.held)
     }
 
     /// Whether the account is frozen, which happens on a chargeback.

@@ -138,8 +138,10 @@ the whole path from input row to account state.
 `tests/cli.rs` covers what the unit tests cannot see: it runs the compiled
 binary and asserts on the contract a caller actually observes — the report on
 stdout, the diagnostics on stderr, and the exit status — for a well-formed
-input, an input with no rows, a malformed record, an unreadable file, and an
-invocation that does not name exactly one file.
+input, an input with no rows, a malformed record, an unreadable file, an
+invocation that does not name exactly one file, and a report whose destination
+closes before it can be written, which is the one failure that can only be
+provoked from outside the process.
 
 Every transaction type is covered on both its happy path and its negative ones:
 a withdrawal that is not covered, that is covered only by held funds, or that
@@ -177,6 +179,14 @@ a fraction of a cent: the type system rejects the arithmetic rather than the
 reviewer having to spot it. Amounts are `rust_decimal::Decimal`, which
 represents four decimal places exactly.
 
+**No arithmetic that can panic.** `arithmetic_side_effects` is denied, so adding
+two balances has to be a checked operation. A plain `+` on a decimal panics on
+overflow, and denying `panic` does not catch that — it covers the macro, not an
+operator that panics inside — so the rule is stated separately rather than
+assumed. The single exemption, in [`clippy.toml`](clippy.toml), is negating an
+amount: a decimal carries its sign as a flag, so flipping it cannot overflow and
+has nothing to check.
+
 **Balance changes are checked and all-or-nothing.** `Account` keeps its
 balances private, and every mutation goes through one checked helper that
 computes the new available and held amounts, verifies that they and their sum
@@ -211,30 +221,23 @@ asserting on its streams and exit status.
 
 ### Resource use under hostile input
 
-The input is streamed and never held in memory in full, so file size is not a
-bound on memory. What the engine retains is bounded by the input's cardinality
-rather than its length: one account per client (at most `u16::MAX` of them) and
-one small record per applied deposit, since a deposit is the only thing a
-dispute can refer back to. Withdrawals are not retained at all. There is no
-recursion anywhere, so no input can exhaust the stack.
-
-Two bounds are worth stating plainly. Transaction IDs are `u32`, so a stream of
-distinct deposits can grow the history to `u32::MAX` records; the amount kept
-per record is deliberately minimal, but the growth is inherent in being able to
-dispute any earlier deposit. And the CSV reader imposes no limit on the size of
-a single field, so one absurdly long field could still allocate. In a server
-taking these streams from the network, both would be addressed outside the
-engine — a cap on the record size at the edge, and a persistent, ageing-out
-store behind the history — rather than by changing the transaction logic. What
-the engine costs in practice is measured under [Efficiency](#efficiency) below.
+No input can exhaust the stack, because there is no recursion anywhere. What an
+input can grow is the engine's memory, and only along the two axes measured
+under [Efficiency](#efficiency): one account per client, and one record per
+deposit that could still be disputed. Neither is bounded by the size of the
+file, but the second is bounded only by `u32::MAX` — the range of a transaction
+ID. The CSV reader also imposes no limit on the size of a single field, so one
+absurdly long field could still allocate. A server taking these streams from the
+network would address both outside the engine — a cap on the record size at the
+edge, and a persistent, ageing-out store behind the history — rather than by
+changing the transaction logic.
 
 ## Efficiency
 
 **The input is a stream, not a data structure.** The CSV reader decodes one
 record at a time into a buffer it reuses, `main` applies each record as it
-arrives, and the report is written at the end from the accounts alone. Nothing
-ever holds the input, or a collection derived from it, in full — so the size of
-the file is not a bound on memory, and a 100 GB file is no different from a 100
+arrives, and the report is written at the end from the accounts alone. The size
+of the file is not a bound on memory: a 100 GB file is no different from a 100
 KB one.
 
 **Memory tracks what can still be disputed, not what has been read.** The engine
@@ -250,11 +253,10 @@ size show the difference:
 | 55% deposits — 2.75 million disputable records | 1.4 s | 216 MB |
 
 Measured on an M4 Max with a release build; the same runs take 2.1 s through
-`cargo run`. The second row is the honest worst case: the history is what a
-dispute needs to refer back to, and transaction IDs are `u32`, so a stream of
-distinct deposits can grow it to `u32::MAX` records. That growth is inherent in
-the feature, not in the implementation, which is why the record is kept as small
-as it is.
+`cargo run`. The second row is the honest worst case: transaction IDs are `u32`,
+so a stream of distinct deposits can grow the history to `u32::MAX` records.
+That growth is inherent in being able to dispute any earlier deposit, which is
+why the record is kept as small as it is.
 
 **Amounts are read from the digits, not guessed at.** Left to itself, the CSV
 reader decides what each field looks like and hands a numeric-looking one over
@@ -264,16 +266,22 @@ The amount column is therefore decoded straight from its text
 ([`src/transaction.rs`](src/transaction.rs)), which is exact and cut about 20%
 off the total runtime.
 
+**The history is hashed with a hasher that cannot be gamed.** Transaction IDs
+are `u32`, which a faster non-cryptographic hasher would suit — but they are
+chosen by whoever sends the input, so that hasher would let a hostile partner
+pick IDs that all land in one bucket and turn every lookup into a linear scan.
+The standard library's hasher is kept for that reason, not by default.
+
 **One engine per stream, no shared state.** The engine is an ordinary value that
 owns its accounts and its history; there is no global, no lock, and no shared
 mutability anywhere in the crate. Reading is generic over `Read`, so the same
 code path serves a file, a socket, or a test fixture. A server taking thousands
 of concurrent streams gives each one its own engine and runs them in parallel
 with no coordination at all — a unit test in [`src/engine.rs`](src/engine.rs)
-does exactly that across threads. Since memory is per-stream, the bound worth
-watching in that setting is the disputable history summed over the live streams;
-as noted above, a server would put a persistent, ageing-out store behind it
-rather than change the transaction logic.
+does exactly that across threads. The bound worth watching in that setting is
+the disputable history summed over the live streams, which a server would
+address with a persistent, ageing-out store rather than by changing the
+transaction logic.
 
 ## Maintainability
 
@@ -299,32 +307,25 @@ CSV row --> input --> transaction --> engine --> account --> output --> CSV row
 | `tests/cli.rs` | End-to-end tests of the binary: its streams and exit status |
 
 **Every rule about money lives in one module, and every rule about balances in
-another.** If you want to know what a chargeback does, `src/engine.rs` has one
-short method per transaction type and nothing else. If you want to know that the
-arithmetic is sound, `src/account.rs` is barely a hundred lines of code and
-every mutation funnels through a single checked helper. Neither module can be
-broken by a change to the CSV handling at either end, and the CSV handling knows
-nothing about disputes.
+another.** To see what a chargeback does, `src/engine.rs` has one short method
+per transaction type and nothing else. To see that the arithmetic is sound,
+`src/account.rs` is barely a hundred lines and every mutation funnels through a
+single checked helper. Neither can be broken by a change to the CSV handling at
+either end, and the CSV handling knows nothing about disputes.
 
 **The reasoning sits on the code it explains.** Each decision the specification
 leaves open is documented on the method that implements it, so the "why" is
-found by reading the "what" rather than by cross-referencing a document — the
-[Assumptions](#assumptions) below are a summary of those comments, not their
-home. Comments throughout explain intent; anything a reader could get from the
-code itself is left to the code.
-
-**Names, not cleverness.** The domain speaks for itself — `deposit`, `withdraw`,
-`hold`, `release`, `reverse`, `disputable`. Amounts, client IDs and transaction
-IDs are named types rather than bare integers. Nothing is abbreviated, no
-function takes a boolean flag that changes what it does, and there is no macro,
-no generic machinery, and no abstraction with a single implementation.
+found by reading the "what" — the [Assumptions](#assumptions) below summarize
+those comments rather than replacing them. Names come from the domain
+(`deposit`, `hold`, `release`, `reverse`, `disputable`) and amounts, client IDs
+and transaction IDs are named types rather than bare integers.
 
 **Guardrails are declared, not remembered.** The lints in
-[`Cargo.toml`](Cargo.toml) mean the panic-free and float-free rules cannot be
-broken by someone who has not read this file, and `missing_docs` means a new
-public item without an explanation fails the build. There is one place the CSV
-reader is configured, one place a balance can change, and one place an error
-becomes a message — so a change lands in exactly one spot.
+[`Cargo.toml`](Cargo.toml) mean the panic-free, overflow-checked and float-free
+rules cannot be broken by someone who has not read this file, and `missing_docs`
+means a new public item without an explanation fails the build. There is one
+place the CSV reader is configured, one place a balance can change, and one
+place an error becomes a message — so a change lands in exactly one spot.
 
 **The documentation is tested.** The sample input and the report shown under
 [Running](#running) are asserted by a test in `src/output.rs`, so the example a
@@ -367,6 +368,13 @@ each decision, in `src/engine.rs`:
   report that prints it — otherwise a fraction too small to show could still be
   counted, and the reported `available` and `held` would no longer add up to the
   reported `total` — and it never credits a client a fraction they did not send.
+- **A row carrying a field beyond the four columns is read, and the extra field
+  dropped.** Accepting a row that stops after `tx` — which a dispute may — means
+  accepting a longer one too, and that is the right way round: all four columns
+  are still required by name and still parsed, so a row with something extra
+  alongside them is not ambiguous. A header that fails to name one of the four
+  is a different matter and aborts the run, since it is what the fields are read
+  by.
 
 Anything the engine cannot apply is ignored and processing continues, as the
 specification requires. A malformed CSV record, on the other hand, aborts the

@@ -162,3 +162,7 @@ In the CLAUDE.md there's an info about prompt log. Modify it, so when the user a
 ## 2026-08-29 15:09:10
 
 /commit
+
+## 2026-08-29 15:16:17
+
+Apply all fixes found by the /score skill

@@ -13,6 +13,17 @@ use crate::transaction::Transaction;
 /// empty — or omit it entirely — are accepted, since disputes, resolves and
 /// chargebacks carry no amount. The settings live here, in one place, so that
 /// reading a file and reading a stream cannot drift apart.
+///
+/// Accepting a short row means accepting a long one too: the flexible reader
+/// stops checking the width of a row in either direction, so a trailing field
+/// beyond `amount` is dropped rather than rejected. That is the right way round
+/// for this program. A row is refused when it cannot be understood — a missing
+/// `tx`, an unknown type, an amount that is not a decimal — and every one of the
+/// four columns the format defines is still required by name and still parsed,
+/// so a row carrying something extra alongside them is not ambiguous, merely
+/// wider than it needs to be. The header, on the other hand, has to name all
+/// four columns: it is what the fields are read by, so a missing one is not
+/// extra material but a row whose meaning cannot be recovered.
 fn builder() -> ReaderBuilder {
     let mut builder = ReaderBuilder::new();
     builder.trim(Trim::All).flexible(true);
@@ -82,6 +93,35 @@ mod tests {
 
         assert_eq!(transactions.len(), 2);
         assert!(transactions.iter().all(|t| t.amount.is_none()));
+    }
+
+    #[test]
+    fn drops_a_field_beyond_the_columns_the_format_defines() {
+        // The four columns are all present and read as usual; anything after
+        // them is surplus rather than ambiguity, so the row still stands.
+        let transactions = read_all("type,client,tx,amount\ndeposit,1,1,1.0,surplus\n");
+
+        assert_eq!(
+            transactions,
+            vec![Transaction {
+                kind: TransactionType::Deposit,
+                client: 1,
+                tx: 1,
+                amount: Some(Decimal::ONE),
+            }]
+        );
+    }
+
+    #[test]
+    fn reports_a_header_that_does_not_name_every_column() {
+        // Unlike a surplus field, a column missing from the header cannot be
+        // worked around: it is what the fields are read by.
+        let mut records = read_transactions("type,client,tx\ndispute,1,1\n".as_bytes());
+
+        assert!(
+            records.next().expect("a record is present").is_err(),
+            "a header without the amount column should not be readable"
+        );
     }
 
     #[test]

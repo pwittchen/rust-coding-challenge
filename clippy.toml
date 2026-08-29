@@ -6,3 +6,9 @@ allow-unwrap-in-tests = true
 allow-expect-in-tests = true
 allow-panic-in-tests = true
 allow-indexing-slicing-in-tests = true
+
+# `arithmetic_side_effects`, denied in `Cargo.toml`, is there to force every sum
+# of two balances through a checked operation. Negating one is exempt: a decimal
+# carries its sign as a flag rather than in the digits, so flipping it cannot
+# overflow and has nothing to check. Addition and subtraction stay covered.
+arithmetic-side-effects-allowed-unary = ["rust_decimal::Decimal"]

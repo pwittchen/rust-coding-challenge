@@ -158,6 +158,13 @@ impl TransactionRecord {
 ///
 /// A map rather than a list, because disputes, resolves and chargebacks always
 /// look a transaction up by ID and never iterate over the history.
+///
+/// The standard library's hasher is kept deliberately, rather than swapped for
+/// one of the faster ones that suit a `u32` key. Transaction IDs are chosen by
+/// whoever sends the input, so a faster hasher would let a hostile partner pick
+/// IDs that all land in one bucket and turn every lookup into a linear scan.
+/// Paying for a hash that cannot be gamed is the right trade for an engine meant
+/// to survive a stream it does not control.
 pub type Transactions = HashMap<TxId, TransactionRecord>;
 
 #[cfg(test)]

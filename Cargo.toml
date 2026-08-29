@@ -32,6 +32,12 @@ indexing_slicing = "deny"
 # Balances are fixed-point decimals. A float would silently lose cents, so the
 # type is not merely avoided by convention — arithmetic on one will not compile.
 float_arithmetic = "deny"
+# Decimal addition panics on overflow, which `panic = "deny"` above cannot see:
+# it catches the `panic!` macro, not an operator that panics internally. Every
+# sum of two balances therefore has to be a checked operation, enforced here
+# rather than argued for in a comment. The exemption for negation lives in
+# `clippy.toml`, with the reason it is safe.
+arithmetic_side_effects = "deny"
 
 # The engine is normally run through `cargo run`, which builds without
 # optimizations, and an unoptimized build spends roughly eight times as long on

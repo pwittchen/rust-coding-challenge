@@ -60,10 +60,13 @@ Design points worth preserving when changing the code:
   exit code.
 - **Safety rules are enforced by the compiler, not by review.** `Cargo.toml`
   forbids `unsafe_code` and denies `clippy::unwrap_used`, `expect_used`,
-  `panic`, `indexing_slicing` and `float_arithmetic` package-wide; `clippy.toml`
-  exempts test code only. Don't weaken these, and don't reach for `#[allow]` —
-  the fix is to return an error instead. They are described in the README's
-  "Safety and robustness" section; keep the two in sync.
+  `panic`, `indexing_slicing`, `float_arithmetic` and `arithmetic_side_effects`
+  package-wide; `clippy.toml` exempts test code, and negation of a `Decimal`,
+  which cannot overflow. Don't weaken these, and don't reach for `#[allow]` —
+  the fix is to return an error, or to use the checked form of the operation.
+  Summing two balances goes through `checked_add` or `saturating_add`, never
+  `+`, because a `Decimal` addition panics on overflow. They are described in
+  the README's "Safety and robustness" section; keep the two in sync.
 - **Every public item is documented, and the build enforces it.** `Cargo.toml`
   denies `missing_docs`, so a new public item, field or module without a doc
   comment fails the build. The fix is to write the comment, not to silence the
@@ -79,12 +82,12 @@ Design points worth preserving when changing the code:
 
 ## Tests
 
-Unit tests live in `mod tests` next to the code they cover (67 at present).
+Unit tests live in `mod tests` next to the code they cover (69 at present).
 Engine and output tests drive the code through the same CSV parsing the binary
 uses, so they exercise the whole path from input row to account state. New
 behaviour needs a test in the module that owns it.
 
-`tests/cli.rs` holds the end-to-end tests (5 at present): they run the compiled
+`tests/cli.rs` holds the end-to-end tests (6 at present): they run the compiled
 binary and assert on stdout, stderr and the exit status, which is the only place
 that contract can be observed. Anything about how the program reports a failure
 belongs there.

@@ -266,7 +266,10 @@ mod tests {
         assert_eq!(account.held(), expected(held), "held funds");
         assert_eq!(
             account.total(),
-            account.available() + account.held(),
+            account
+                .available()
+                .checked_add(account.held())
+                .expect("the balances should add up to a representable total"),
             "total funds"
         );
     }

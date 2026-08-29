@@ -3,8 +3,9 @@
 //! The unit tests cover what the engine does with a transaction; these cover
 //! what the program does with a *run*: which stream each result goes to, and
 //! what the exit status says about it. That contract cannot be observed from
-//! inside the crate, because it is made of the process's stdout, stderr and
-//! status code, so it is exercised here by running the binary itself.
+//! inside the crate, because it is made of the process's stdout, stderr, status
+//! code and the pipes they are attached to, so it is exercised here by running
+//! the binary itself.
 
 // Clippy's exemption for panicking in tests recognises `#[test]` functions but
 // not the helpers they share, which are test code just the same: a fixture that
@@ -15,7 +16,7 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::{Command, Output, Stdio};
 
 /// The binary built from this crate, wired up by Cargo.
 const BINARY: &str = env!("CARGO_BIN_EXE_rust-coding-challenge");
@@ -118,6 +119,50 @@ fn reports_an_input_file_that_cannot_be_read() {
         stderr_of(&output).contains("does-not-exist.csv"),
         "stderr: {}",
         stderr_of(&output)
+    );
+}
+
+#[test]
+fn reports_a_report_that_cannot_be_written() {
+    // Enough clients that the report cannot fit in the pipe's buffer, so at
+    // least one write reaches the closed end however the two processes happen
+    // to be scheduled.
+    const CLIENTS: u16 = 5_000;
+
+    let mut input = String::from("type, client, tx, amount\n");
+    for client in 0..CLIENTS {
+        input.push_str(&format!("deposit, {client}, {client}, 1.0\n"));
+    }
+
+    let path = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("closed-stdout.csv");
+    fs::write(&path, &input).expect("the input file should be writable");
+
+    let mut child = Command::new(BINARY)
+        .arg(&path)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("the binary should be runnable");
+
+    // Closing the reading end of the pipe is what makes writing the report
+    // fail; there is no other way to reach that path from outside the process.
+    drop(child.stdout.take().expect("stdout should be a pipe"));
+
+    let output = child.wait_with_output().expect("the run should finish");
+
+    fs::remove_file(&path).expect("the input file should be removable");
+
+    assert!(
+        !output.status.success(),
+        "a report that cannot be written in full fails the run"
+    );
+
+    // The run must say the report was lost rather than exiting quietly, so that
+    // a truncated report is never taken for the account state.
+    let stderr = stderr_of(&output);
+    assert!(
+        stderr.contains("could not write the report"),
+        "stderr: {stderr}"
     );
 }
 
