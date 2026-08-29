@@ -70,3 +70,11 @@ in the CLAUDE.md add info that after implementing each change, we need to run ca
 ## 2026-08-29 12:56:21
 
 /commit
+
+## 2026-08-29 13:59:21
+
+According to the description in the SPEC.md implement transaction logic. Keep all the logic in the separate file (engine.rs). Also implement printing output result to the file according to the guidelines in the SPEC.md so in the sample accounts.csv file should contain appropriate output data.
+
+## 2026-08-29 14:06:06
+
+/commit

@@ -1,14 +1,11 @@
 use std::env;
 use std::error::Error;
-use std::io::{self, Write};
+use std::io;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use rust_coding_challenge::input;
-use rust_coding_challenge::transaction::Transaction;
-
-/// Header of the account report, per the required output format.
-const ACCOUNT_COLUMNS: [&str; 5] = ["client", "available", "held", "total", "locked"];
+use rust_coding_challenge::engine::Engine;
+use rust_coding_challenge::{input, output};
 
 fn main() -> ExitCode {
     if let Err(error) = run() {
@@ -26,16 +23,18 @@ fn run() -> Result<(), Box<dyn Error>> {
     // reported here instead.
     let describe = |error: csv::Error| format!("{}: {error}", path.display());
 
-    // The transactions are only loaded for now; applying them to accounts comes
-    // next, at which point the stream can be consumed record by record instead
-    // of being collected.
-    let transactions: Vec<Transaction> = input::read_transactions_from_path(&path)
-        .map_err(describe)?
-        .collect::<Result<_, _>>()
-        .map_err(describe)?;
-    eprintln!("loaded {} transactions", transactions.len());
+    let transactions = input::read_transactions_from_path(&path).map_err(describe)?;
 
-    write_accounts(io::stdout().lock())
+    // The records are applied as they are read, so only the account state and
+    // the disputable transactions are ever held in memory.
+    let mut engine = Engine::new();
+    for transaction in transactions {
+        engine.apply(&transaction.map_err(describe)?);
+    }
+
+    output::write_accounts(io::stdout().lock(), engine.accounts())?;
+
+    Ok(())
 }
 
 /// Returns the input file, the first and only argument to the binary.
@@ -51,15 +50,4 @@ fn input_path() -> Result<PathBuf, Box<dyn Error>> {
     }
 
     Ok(PathBuf::from(path))
-}
-
-/// Writes the account report to `writer`.
-///
-/// Only the header is written so far, since no account state is derived yet.
-fn write_accounts<W: Write>(writer: W) -> Result<(), Box<dyn Error>> {
-    let mut writer = csv::Writer::from_writer(writer);
-    writer.write_record(ACCOUNT_COLUMNS)?;
-    writer.flush()?;
-
-    Ok(())
 }
