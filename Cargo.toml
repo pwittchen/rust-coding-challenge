@@ -7,3 +7,24 @@ edition = "2024"
 csv = "1.4.0"
 rust_decimal = { version = "1.42.1", default-features = false, features = ["serde", "std"] }
 serde = { version = "1.0.229", features = ["derive"] }
+
+# The safety rules the code is written to are enforced by the compiler rather
+# than left to review. They apply to every target of the crate, the binary
+# included; the exceptions for test code live in `clippy.toml`.
+[lints.rust]
+# The engine handles money: there is no reason for it to reach for unsafe, and
+# `forbid` means not even a local `allow` can turn this off again.
+unsafe_code = "forbid"
+
+[lints.clippy]
+# Nothing outside the tests may panic. Every failure is a value the caller has
+# to deal with, so a bad record or an unreadable file ends the run with a
+# message rather than a backtrace, and no input can take the process down
+# part-way through a report.
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+indexing_slicing = "deny"
+# Balances are fixed-point decimals. A float would silently lose cents, so the
+# type is not merely avoided by convention — arithmetic on one will not compile.
+float_arithmetic = "deny"

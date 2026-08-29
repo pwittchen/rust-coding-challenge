@@ -8,6 +8,13 @@ use std::process::ExitCode;
 use rust_coding_challenge::engine::Engine;
 use rust_coding_challenge::{input, output};
 
+/// Runs the engine, reporting any failure on stderr.
+///
+/// Every error the program can hit — a wrong invocation, an unreadable file, a
+/// record that will not parse, a report that cannot be written — arrives here as
+/// a value and ends the run with a message and a non-zero status. Nothing
+/// panics, so a failed run is never a backtrace and never a half-written report
+/// that looks like a whole one.
 fn main() -> ExitCode {
     if let Err(error) = run() {
         eprintln!("error: {error}");
@@ -33,7 +40,11 @@ fn run() -> Result<(), Box<dyn Error>> {
         engine.apply(&transaction.map_err(describe)?);
     }
 
-    output::write_accounts(io::stdout().lock(), engine.accounts())?;
+    // A report that could not be written in full — a full disk, a closed pipe —
+    // is an error rather than a silent truncation, so that a partial report is
+    // never mistaken for the account state.
+    output::write_accounts(io::stdout().lock(), engine.accounts())
+        .map_err(|error| format!("could not write the report: {error}"))?;
 
     Ok(())
 }

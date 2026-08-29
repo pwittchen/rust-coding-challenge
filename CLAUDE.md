@@ -38,6 +38,7 @@ The crate is a library plus a thin binary that drives it:
 | `src/account.rs` | A client's account: its balances and the checked operations that move them |
 | `src/engine.rs` | All transaction logic: deposits, withdrawals, disputes, chargebacks |
 | `src/output.rs` | Writing the resulting account state as CSV |
+| `tests/cli.rs` | End-to-end tests of the binary: its streams and exit status |
 
 Design points worth preserving when changing the code:
 
@@ -54,6 +55,12 @@ Design points worth preserving when changing the code:
   unknown transaction ID or an uncovered withdrawal is skipped and processing
   continues; a record that will not parse is an error on stderr and a non-zero
   exit code.
+- **Safety rules are enforced by the compiler, not by review.** `Cargo.toml`
+  forbids `unsafe_code` and denies `clippy::unwrap_used`, `expect_used`,
+  `panic`, `indexing_slicing` and `float_arithmetic` package-wide; `clippy.toml`
+  exempts test code only. Don't weaken these, and don't reach for `#[allow]` —
+  the fix is to return an error instead. They are described in the README's
+  "Safety and robustness" section; keep the two in sync.
 - **Assumptions are documented where they are implemented.** The open cases in
   the spec are resolved in `src/engine.rs`, with the reasoning on the method that
   implements each decision, and summarized in the README's "Assumptions"
@@ -66,10 +73,16 @@ Engine and output tests drive the code through the same CSV parsing the binary
 uses, so they exercise the whole path from input row to account state. New
 behaviour needs a test in the module that owns it.
 
+`tests/cli.rs` holds the end-to-end tests (5 at present): they run the compiled
+binary and assert on stdout, stderr and the exit status, which is the only place
+that contract can be observed. Anything about how the program reports a failure
+belongs there.
+
 Also in the repo: `README.md` (user-facing documentation), `transactions.csv`
-(sample input), and `.github/workflows/rust.yml` (CI: `cargo build` and
-`cargo test` on push and PR to `master`). `accounts.csv` is generated output and
-is gitignored.
+(sample input), `clippy.toml` (the test-only exemptions from the safety lints),
+and `.github/workflows/rust.yml` (CI: `cargo fmt --check`, `cargo build`,
+`cargo clippy` and `cargo test` on push and PR to `master`). `accounts.csv` is
+generated output and is gitignored.
 
 ## Prompt log
 
@@ -117,7 +130,8 @@ cargo test     # the tests must pass
 
 Run all three before reporting the change as done, and fix anything they
 surface. A change is not finished while any of them fails.
-`cargo clippy -- -D warnings` should stay clean too.
+`cargo clippy --all-targets -- -D warnings` must stay clean too — it is what
+enforces the safety lints, and CI runs it alongside `cargo fmt --check`.
 
 ## Commands
 
@@ -126,7 +140,7 @@ cargo run -- transactions.csv > accounts.csv   # required CLI contract
 cargo build
 cargo test
 cargo fmt
-cargo clippy -- -D warnings
+cargo clippy --all-targets -- -D warnings
 ```
 
 Toolchain: Rust edition 2024, which requires rustc 1.85 or newer; developed and

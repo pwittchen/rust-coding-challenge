@@ -1,0 +1,8 @@
+# The panic-free rules declared in `Cargo.toml` apply to the code that runs in
+# production. Tests are the one place where panicking is the point: an
+# assertion that fails, or an `expect` on a fixture that could not be set up,
+# is how a test reports a problem.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+allow-indexing-slicing-in-tests = true
