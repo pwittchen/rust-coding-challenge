@@ -45,7 +45,10 @@ Design points worth preserving when changing the code:
 - **Streaming.** Records are deserialized and applied one at a time; the input is
   never held in memory in full. Keep it that way.
 - **Fixed-point amounts.** Money is `rust_decimal::Decimal`, never a float.
-  Balances are reported with exactly four decimal places.
+  Balances are reported with exactly four decimal places. The `amount` column has
+  a hand-written deserializer in `src/transaction.rs`: without it the CSV reader
+  infers the field's type and hands numbers over as `f64`, which rounds large
+  amounts and is slower. Don't replace it with the derived default.
 - **Balance mutations are all-or-nothing.** `Account` (in `src/account.rs`)
   keeps its fields private and every mutation goes through checked arithmetic
   that leaves the account untouched on overflow, so `total = available + held`

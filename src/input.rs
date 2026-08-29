@@ -107,6 +107,18 @@ mod tests {
     }
 
     #[test]
+    fn reads_an_amount_that_no_float_could_hold_exactly() {
+        // Every digit survives the read. A float has around fifteen significant
+        // ones, so anything decoded through a float would come back rounded.
+        let transactions = read_all("type,client,tx,amount\ndeposit,1,1,123456789012345.6789\n");
+
+        assert_eq!(
+            transactions[0].amount,
+            Some("123456789012345.6789".parse().expect("valid decimal"))
+        );
+    }
+
+    #[test]
     fn reads_no_records_from_an_input_without_rows() {
         assert!(read_all("").is_empty());
         assert!(read_all("type, client, tx, amount\n").is_empty());

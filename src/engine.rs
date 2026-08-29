@@ -763,6 +763,19 @@ mod tests {
     }
 
     #[test]
+    fn keeps_an_amount_that_no_float_could_hold_exactly() {
+        // The balance carries every digit of the deposits, which a float would
+        // have rounded away long before the second one was added.
+        let engine = engine(
+            "type,client,tx,amount\n\
+             deposit,1,1,123456789012345.6789\n\
+             deposit,1,2,0.0001\n",
+        );
+
+        assert_balances(&engine, 1, "123456789012345.6790", "0");
+    }
+
+    #[test]
     fn accepts_the_largest_client_and_transaction_ids() {
         let engine = engine(
             "type,client,tx,amount\n\
