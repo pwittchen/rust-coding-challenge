@@ -41,6 +41,7 @@ are pure Rust and are fetched by Cargo on the first build.
 ```sh
 cargo build             # debug build
 cargo build --release   # optimized build
+cargo clean             # remove target/, the build artifacts of both profiles
 ```
 
 ## Running
